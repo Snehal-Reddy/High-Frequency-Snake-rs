@@ -1,7 +1,5 @@
-mod game;
-
-use game::engine::GameState;
-use game::types::{Direction, Input};
+use high_frequency_snake::game::engine::GameState;
+use high_frequency_snake::game::types::{Direction, Input};
 
 fn main() {
     println!("Snake Battle Royale: Low Level Optimization Playground");

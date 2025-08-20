@@ -21,7 +21,7 @@ impl Grid {
         }
     }
 
-    pub fn get_cell(&self, point: Point) -> Cell {
+    pub fn get_cell(&self, point: &Point) -> Cell {
         self.cells[point.y as usize][point.x as usize]
     }
 

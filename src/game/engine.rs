@@ -1,9 +1,10 @@
 use crate::game::{
     apple::Apple,
-    grid::Grid,
+    grid::{self, Grid},
     snake::Snake,
     types::{Direction, Input, Point},
 };
+use grid::Cell;
 use std::collections::HashMap;
 
 pub struct GameState {
@@ -33,7 +34,18 @@ impl GameState {
                 "Tick: Received input for snake {}: {:?}. Game state not changed.",
                 input.snake_id, input.direction
             );
+            // self.snakes.get_mut(&input.snake_id).unwrap().change_direction(input.direction);
         }
+        // for (id, snake) in self.snakes.iter_mut() {
+        //     snake.move_forward();
+        //     let head = snake.body.front().unwrap();
+        //     if (self.grid.get_cell(head) == Cell::Apple) {
+        //         snake.grow();
+        //     }
+        //     else if(self.grid.get_cell(head) == Cell::Snake) {
+        //         snake.is_alive = false;
+        //     }
+        // }
     }
 }
 
