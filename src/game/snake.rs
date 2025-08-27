@@ -1,5 +1,7 @@
 use crate::game::types::{Direction, Point};
-use std::collections::VecDeque;
+use std::{collections::VecDeque};
+
+pub const SNAKE_CAPACITY: usize = 1024;
 
 pub struct Snake {
     pub id: u32,
