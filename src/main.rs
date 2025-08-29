@@ -4,8 +4,14 @@ use high_frequency_snake::ipc::spsc::Spsc;
 use rand::Rng;
 use std::sync::Arc;
 use std::thread;
+use std::time::Instant;
 
 const QUEUE_CAPACITY: usize = 1024;
+
+#[cfg(feature = "profile")]
+fn get_cpu_cycles() -> u64 {
+    unsafe { std::arch::x86_64::_rdtsc() }
+}
 
 fn main() {
     println!("Snake Battle Royale: Low Level Optimization Playground");
@@ -60,16 +66,79 @@ fn main() {
             game_thread_core.id
         );
 
-        loop {
-            // Drain the queue
-            while let Some(input) = consumer_queue.consume() {
-                inputs.push(input);
-            }
+        #[cfg(feature = "profile")]
+        {
+            let mut tick_count = 0u64;
+            let mut total_consume_cycles = 0u64;
+            let mut total_tick_cycles = 0u64;
+            let mut min_consume_cycles = u64::MAX;
+            let mut max_consume_cycles = 0u64;
+            let mut min_tick_cycles = u64::MAX;
+            let mut max_tick_cycles = 0u64;
+            let start_time = Instant::now();
 
-            // Process the collected inputs
-            if !inputs.is_empty() {
-                game_state.tick(&inputs);
-                inputs.clear();
+            loop {
+                // Measure the consume part
+                let consume_start_cycles = get_cpu_cycles();
+                while let Some(input) = consumer_queue.consume() {
+                    inputs.push(input);
+                }
+                let consume_end_cycles = get_cpu_cycles();
+                let consume_cycles = consume_end_cycles - consume_start_cycles;
+
+                // Process the collected inputs
+                if !inputs.is_empty() {
+                    // Measure the tick part
+                    let tick_start_cycles = get_cpu_cycles();
+                    game_state.tick(&inputs);
+                    let tick_end_cycles = get_cpu_cycles();
+                    let tick_cycles = tick_end_cycles - tick_start_cycles;
+                    
+                    // Update consume statistics
+                    total_consume_cycles += consume_cycles;
+                    min_consume_cycles = min_consume_cycles.min(consume_cycles);
+                    max_consume_cycles = max_consume_cycles.max(consume_cycles);
+                    
+                    // Update tick statistics
+                    total_tick_cycles += tick_cycles;
+                    min_tick_cycles = min_tick_cycles.min(tick_cycles);
+                    max_tick_cycles = max_tick_cycles.max(tick_cycles);
+                    
+                    inputs.clear();
+                }
+
+                tick_count += 1;
+
+                // Report performance every 1000 ticks
+                if tick_count % 1000 == 0 {
+                    let elapsed = start_time.elapsed();
+                    let ticks_per_second = tick_count as f64 / elapsed.as_secs_f64();
+                    let avg_consume_cycles = total_consume_cycles / tick_count;
+                    let avg_tick_cycles = total_tick_cycles / tick_count;
+                    
+                    println!(
+                        "Tick {}: {:.2} ticks/sec | Consume: avg={} cycles, min={} cycles, max={} cycles | Tick: avg={} cycles, min={} cycles, max={} cycles",
+                        tick_count, ticks_per_second, 
+                        avg_consume_cycles, min_consume_cycles, max_consume_cycles,
+                        avg_tick_cycles, min_tick_cycles, max_tick_cycles
+                    );
+                }
+            }
+        }
+
+        #[cfg(not(feature = "profile"))]
+        {
+            loop {
+                // Drain the queue
+                while let Some(input) = consumer_queue.consume() {
+                    inputs.push(input);
+                }
+
+                // Process the collected inputs
+                if !inputs.is_empty() {
+                    game_state.tick(&inputs);
+                    inputs.clear();
+                }
             }
         }
     });
