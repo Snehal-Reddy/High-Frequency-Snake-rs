@@ -1,4 +1,4 @@
-use criterion::{criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, criterion_group, criterion_main};
 use high_frequency_snake::game::types::{Direction, Input};
 use high_frequency_snake::ipc::spsc::Spsc;
 use std::hint::black_box;
@@ -34,11 +34,18 @@ fn spsc_throughput_bench(c: &mut Criterion) {
         let producer_done_tx = done_tx.clone();
         let producer_start_rx = Arc::clone(&start_rx);
         thread::spawn(move || {
-            let input = Input { snake_id: 1, direction: Direction::Up };
+            let input = Input {
+                snake_id: 1,
+                direction: Direction::Up,
+            };
             loop {
-                if producer_start_rx.lock().unwrap().recv().is_err() { break; }
+                if producer_start_rx.lock().unwrap().recv().is_err() {
+                    break;
+                }
                 for _ in 0..NUM_MESSAGES {
-                    while !producer_queue.produce(input) { thread::yield_now(); }
+                    while !producer_queue.produce(input) {
+                        thread::yield_now();
+                    }
                 }
                 producer_done_tx.send(()).unwrap();
             }
@@ -48,9 +55,13 @@ fn spsc_throughput_bench(c: &mut Criterion) {
         let consumer_start_rx = Arc::clone(&start_rx);
         thread::spawn(move || {
             loop {
-                if consumer_start_rx.lock().unwrap().recv().is_err() { break; }
+                if consumer_start_rx.lock().unwrap().recv().is_err() {
+                    break;
+                }
                 for _ in 0..NUM_MESSAGES {
-                    while queue.consume().is_none() { thread::yield_now(); }
+                    while queue.consume().is_none() {
+                        thread::yield_now();
+                    }
                 }
                 consumer_done_tx.send(()).unwrap();
             }
@@ -89,7 +100,9 @@ fn spsc_latency_bench(c: &mut Criterion) {
             core_affinity::set_for_current(core_b);
             loop {
                 if let Some(timestamp) = pong_ping_queue.consume() {
-                    while !pong_pong_queue.produce(timestamp) { thread::yield_now(); }
+                    while !pong_pong_queue.produce(timestamp) {
+                        thread::yield_now();
+                    }
                 }
             }
         });
@@ -99,7 +112,9 @@ fn spsc_latency_bench(c: &mut Criterion) {
             let mut total_duration = std::time::Duration::new(0, 0);
             for _ in 0..iters {
                 let start = Instant::now();
-                while !ping_queue.produce(start) { thread::yield_now(); }
+                while !ping_queue.produce(start) {
+                    thread::yield_now();
+                }
                 loop {
                     if let Some(received_start) = pong_queue.consume() {
                         total_duration += received_start.elapsed();
@@ -130,11 +145,18 @@ fn spsc_contention_bench(c: &mut Criterion) {
         let producer_done_tx = done_tx.clone();
         let producer_start_rx = Arc::clone(&start_rx);
         thread::spawn(move || {
-            let input = Input { snake_id: 1, direction: Direction::Up };
+            let input = Input {
+                snake_id: 1,
+                direction: Direction::Up,
+            };
             loop {
-                if producer_start_rx.lock().unwrap().recv().is_err() { break; }
+                if producer_start_rx.lock().unwrap().recv().is_err() {
+                    break;
+                }
                 for _ in 0..NUM_MESSAGES {
-                    while !producer_queue.produce(input) { thread::yield_now(); }
+                    while !producer_queue.produce(input) {
+                        thread::yield_now();
+                    }
                 }
                 producer_done_tx.send(()).unwrap();
             }
@@ -144,9 +166,13 @@ fn spsc_contention_bench(c: &mut Criterion) {
         let consumer_start_rx = Arc::clone(&start_rx);
         thread::spawn(move || {
             loop {
-                if consumer_start_rx.lock().unwrap().recv().is_err() { break; }
+                if consumer_start_rx.lock().unwrap().recv().is_err() {
+                    break;
+                }
                 for _ in 0..NUM_MESSAGES {
-                    while queue.consume().is_none() { thread::yield_now(); }
+                    while queue.consume().is_none() {
+                        thread::yield_now();
+                    }
                     busy_spin(BUSY_SPIN_ITERS); // Simulate work
                 }
                 consumer_done_tx.send(()).unwrap();
@@ -172,11 +198,18 @@ fn spsc_contention_bench(c: &mut Criterion) {
         let producer_done_tx = done_tx.clone();
         let producer_start_rx = Arc::clone(&start_rx);
         thread::spawn(move || {
-            let input = Input { snake_id: 1, direction: Direction::Up };
+            let input = Input {
+                snake_id: 1,
+                direction: Direction::Up,
+            };
             loop {
-                if producer_start_rx.lock().unwrap().recv().is_err() { break; }
+                if producer_start_rx.lock().unwrap().recv().is_err() {
+                    break;
+                }
                 for _ in 0..NUM_MESSAGES {
-                    while !producer_queue.produce(input) { thread::yield_now(); }
+                    while !producer_queue.produce(input) {
+                        thread::yield_now();
+                    }
                     busy_spin(BUSY_SPIN_ITERS); // Simulate work
                 }
                 producer_done_tx.send(()).unwrap();
@@ -187,9 +220,13 @@ fn spsc_contention_bench(c: &mut Criterion) {
         let consumer_start_rx = Arc::clone(&start_rx);
         thread::spawn(move || {
             loop {
-                if consumer_start_rx.lock().unwrap().recv().is_err() { break; }
+                if consumer_start_rx.lock().unwrap().recv().is_err() {
+                    break;
+                }
                 for _ in 0..NUM_MESSAGES {
-                    while queue.consume().is_none() { thread::yield_now(); }
+                    while queue.consume().is_none() {
+                        thread::yield_now();
+                    }
                 }
                 consumer_done_tx.send(()).unwrap();
             }
@@ -206,5 +243,10 @@ fn spsc_contention_bench(c: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(benches, spsc_throughput_bench, spsc_latency_bench, spsc_contention_bench);
+criterion_group!(
+    benches,
+    spsc_throughput_bench,
+    spsc_latency_bench,
+    spsc_contention_bench
+);
 criterion_main!(benches);

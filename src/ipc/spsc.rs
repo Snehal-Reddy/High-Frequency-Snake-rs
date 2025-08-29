@@ -71,7 +71,7 @@ impl<T, const N: usize> Spsc<T, N> {
         // Safety
         // This is safe because:
         // 1. We've checked that the queue is not empty.
-        // 2. We are the single consumer, so no other thread is reading from this slot.            
+        // 2. We are the single consumer, so no other thread is reading from this slot.
         let value = unsafe {
             let slot = self.buffer.get_unchecked(head);
             (*slot.get()).assume_init_read()

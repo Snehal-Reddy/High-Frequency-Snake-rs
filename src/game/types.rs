@@ -1,6 +1,6 @@
-use rand::distr::{Distribution, StandardUniform};
-use rand::Rng;
 use crate::game::grid::{GRID_HEIGHT, GRID_WIDTH};
+use rand::Rng;
+use rand::distr::{Distribution, StandardUniform};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Point {

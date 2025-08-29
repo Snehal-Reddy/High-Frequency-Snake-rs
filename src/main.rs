@@ -28,7 +28,10 @@ fn main() {
         core_affinity::set_for_current(input_thread_core);
 
         let mut rng = rand::rng();
-        println!("Input generator thread started on core {:?}", input_thread_core.id);
+        println!(
+            "Input generator thread started on core {:?}",
+            input_thread_core.id
+        );
 
         loop {
             let input = Input {
@@ -52,7 +55,10 @@ fn main() {
 
         let mut game_state = GameState::random();
         let mut inputs = Vec::with_capacity(QUEUE_CAPACITY);
-        println!("Game logic thread started on core {:?}", game_thread_core.id);
+        println!(
+            "Game logic thread started on core {:?}",
+            game_thread_core.id
+        );
 
         loop {
             // Drain the queue

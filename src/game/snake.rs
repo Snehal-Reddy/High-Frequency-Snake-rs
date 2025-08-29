@@ -1,6 +1,6 @@
+use crate::game::grid::{GRID_HEIGHT, GRID_WIDTH};
 use crate::game::types::{Direction, Point};
-use crate::game::grid::{GRID_WIDTH, GRID_HEIGHT};
-use std::{collections::VecDeque};
+use std::collections::VecDeque;
 
 pub const SNAKE_CAPACITY: usize = 1024;
 
@@ -29,18 +29,34 @@ impl Snake {
         let new_head = match self.direction {
             Direction::Up => Point {
                 x: head.x,
-                y: if head.y == 0 { (GRID_HEIGHT - 1) as u16 } else { head.y - 1 },
+                y: if head.y == 0 {
+                    (GRID_HEIGHT - 1) as u16
+                } else {
+                    head.y - 1
+                },
             },
             Direction::Down => Point {
                 x: head.x,
-                y: if head.y == (GRID_HEIGHT - 1) as u16 { 0 } else { head.y + 1 },
+                y: if head.y == (GRID_HEIGHT - 1) as u16 {
+                    0
+                } else {
+                    head.y + 1
+                },
             },
             Direction::Left => Point {
-                x: if head.x == 0 { (GRID_WIDTH - 1) as u16 } else { head.x - 1 },
+                x: if head.x == 0 {
+                    (GRID_WIDTH - 1) as u16
+                } else {
+                    head.x - 1
+                },
                 y: head.y,
             },
             Direction::Right => Point {
-                x: if head.x == (GRID_WIDTH - 1) as u16 { 0 } else { head.x + 1 },
+                x: if head.x == (GRID_WIDTH - 1) as u16 {
+                    0
+                } else {
+                    head.x + 1
+                },
                 y: head.y,
             },
         };
