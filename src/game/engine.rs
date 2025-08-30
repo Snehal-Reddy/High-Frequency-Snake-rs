@@ -1,7 +1,7 @@
 use crate::game::{
-    apple::{APPLE_CAPACITY, Apple},
+    apple::{APPLE_CAPACITY, Apple, GridAwareApple},
     grid::{self, GRID_HEIGHT, GRID_WIDTH, Grid},
-    snake::{SNAKE_CAPACITY, Snake},
+    snake::{SNAKE_CAPACITY, Snake, GridAwareSnake},
     types::{Input, Point},
 };
 use grid::Cell;
@@ -9,17 +9,16 @@ use rand::Rng;
 use std::collections::HashMap;
 
 pub struct GameState {
-    // TODO: static array might give better perf
-    pub snakes: HashMap<u32, Snake>,
-    // TODO: static array might give better perf
-    pub apples: Vec<Apple>,
+    // Using wrapper types that automatically manage grid updates
+    pub snakes: HashMap<u32, GridAwareSnake>,
+    pub apples: Vec<GridAwareApple>,
     pub grid: Grid,
 }
 
 impl GameState {
     // clean this shit up
     pub fn random() -> Self {
-        let mut random_snakes = HashMap::<u32, Snake>::with_capacity(SNAKE_CAPACITY);
+        let mut random_snakes = HashMap::<u32, GridAwareSnake>::with_capacity(SNAKE_CAPACITY);
         let mut grid = Grid::new();
         let mut rng = rand::rng();
 
@@ -60,26 +59,20 @@ impl GameState {
                 }
             };
 
-            // Add snake to the game state
-            random_snakes.insert(index as u32, snake);
-
-            // Update grid with snake positions
-            if let Some(snake) = random_snakes.get(&(index as u32)) {
-                for part in &snake.body {
-                    grid.set_cell(*part, Cell::Snake);
-                }
-            }
+            // Add snake to the game state using wrapper
+            let grid_aware_snake = GridAwareSnake::new(snake, &mut grid);
+            random_snakes.insert(index as u32, grid_aware_snake);
         }
 
         // Spawn apples in empty spaces
-        let mut random_apples = Vec::<Apple>::with_capacity(APPLE_CAPACITY);
+        let mut random_apples = Vec::<GridAwareApple>::with_capacity(APPLE_CAPACITY);
         for _ in 0..APPLE_CAPACITY {
             let mut attempts = 0;
             loop {
                 let apple = Apple::new(rng.random());
                 if grid.get_cell(&apple.position) == Cell::Empty {
-                    grid.set_cell(apple.position, Cell::Apple);
-                    random_apples.push(apple);
+                    let grid_aware_apple = GridAwareApple::new(apple, &mut grid);
+                    random_apples.push(grid_aware_apple);
                     break;
                 }
                 attempts += 1;
@@ -96,82 +89,73 @@ impl GameState {
             grid,
         }
     }
+    
     pub fn new() -> Self {
         Self {
-            // TODO: static array might give better perf
             snakes: HashMap::with_capacity(SNAKE_CAPACITY),
-            // TODO: static array might give better perf
             apples: Vec::with_capacity(APPLE_CAPACITY),
             grid: Grid::new(),
         }
     }
 
-    /// The main game loop.
+    /// The main game loop - now much cleaner with automatic grid updates
     pub fn tick(&mut self, inputs: &[Input]) {
         // Process inputs and update snake directions
-        // TODO: Try inlining functions
         for input in inputs {
             if let Some(snake) = self.snakes.get_mut(&input.snake_id) {
                 snake.change_direction(input.direction);
             }
         }
 
-        // Clear the grid for the new tick
-        self.grid = Grid::new();
-
-        // Update grid with apple positions first
-        for apple in &self.apples {
-            self.grid.set_cell(apple.position, Cell::Apple);
-        }
-
-        // Move snakes and handle collisions
+        // Move snakes sequentially - collisions handled during movement
         let mut consumed_apples = 0;
-        for (_id, snake) in self.snakes.iter_mut() {
-            snake.move_forward();
-            let head = snake.body.front().unwrap();
-
-            // Check for snake collisions first
-            if self.grid.get_cell(head) == Cell::Snake {
-                snake.is_alive = false;
-                continue;
+        
+        for snake in self.snakes.values_mut() {
+            // Check for apple consumption before moving
+            let will_eat_apple = if snake.head().is_some() {
+                let new_head = snake.snake().calculate_new_head();
+                self.grid.get_cell(&new_head) == Cell::Apple
+            } else {
+                false
+            };
+            
+            // Move snake (collision detection happens automatically)
+            if snake.move_forward(&mut self.grid) {
+                // If snake was going to eat an apple, handle it now
+                if will_eat_apple {
+                    if let Some(head) = snake.head().copied() {
+                        // TODO: Maybe we can optimise this? Seems excessive but 128 so fine for perf now.
+                        for apple in &mut self.apples {
+                            if apple.position() == head && apple.is_spawned() {
+                                snake.grow(&mut self.grid); // Grid update happens automatically
+                                apple.consume(&mut self.grid); // Grid update happens automatically
+                                consumed_apples += 1;
+                                break;
+                            }
+                        }
+                    }
+                }
             }
-
-            // Check for apple consumption
-            if self.grid.get_cell(head) == Cell::Apple {
-                snake.grow();
-                consumed_apples += 1;
-            }
-
-            // Update grid with snake positions
-            for part in &snake.body {
-                self.grid.set_cell(*part, Cell::Snake);
-            }
+            // If snake.move_forward() returned false, snake is already dead
         }
 
-        // Remove consumed apples and spawn new ones
+        // Spawn new apples to replace consumed ones
         if consumed_apples > 0 {
-            // Remove consumed apples (any apple that's now under a snake)
-            self.apples
-                .retain(|apple| self.grid.get_cell(&apple.position) != Cell::Snake);
-
-            // Spawn new apples
             for _ in 0..consumed_apples {
                 self.spawn_apple();
             }
         }
 
-        // Cleanup dead snakes
-        self.snakes.retain(|_id, snake| {
-            if !snake.is_alive {
-                // Clear all grid cells occupied by the dead snake
-                for part in &snake.body {
-                    self.grid.set_cell(*part, Cell::Empty);
-                }
-                false // Remove from HashMap
-            } else {
-                true // Keep in HashMap
-            }
-        });
+        // Cleanup dead snakes (grid cleanup already happened in die())
+        self.snakes.retain(|_id, snake| snake.is_alive());
+    }
+
+    /// Add an apple to the game state (grid update happens automatically)
+    pub fn add_apple(&mut self, apple: Apple) {
+        if self.apples.len() < APPLE_CAPACITY {
+            let grid_aware_apple = GridAwareApple::new(apple, &mut self.grid);
+            self.apples.push(grid_aware_apple);
+        }
     }
 
     /// Spawn a new apple at a random empty position
@@ -186,8 +170,8 @@ impl GameState {
             let position = rng.random::<Point>();
             if self.grid.get_cell(&position) == Cell::Empty {
                 let apple = Apple::new(position);
-                self.apples.push(apple);
-                self.grid.set_cell(position, Cell::Apple);
+                let grid_aware_apple = GridAwareApple::new(apple, &mut self.grid);
+                self.apples.push(grid_aware_apple);
                 break;
             }
         }
