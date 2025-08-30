@@ -118,15 +118,6 @@ impl GridAwareSnake {
             return false;
         }
         
-        // Check for self-collision (head hitting own body)
-        let snake_body = &self.snake.body;
-        let head_in_body = snake_body.iter().skip(1).any(|part| *part == new_head);
-        if head_in_body {
-            // Self-collision detected - mark as dead
-            self.snake.is_alive = false;
-            return false;
-        }
-        
         // No collision - proceed with movement
         // Clear the tail position from grid before moving
         if let Some(tail) = self.snake.body.back() {
