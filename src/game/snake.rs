@@ -31,6 +31,7 @@ impl Snake {
     }
     
     /// Calculate where the snake's head will be after moving forward
+    #[inline(always)]
     pub fn calculate_new_head(&self) -> Point {
         let current_head = self.body.front().unwrap();
         match self.direction {
@@ -107,6 +108,7 @@ impl GridAwareSnake {
     
     /// Move the snake forward, automatically updating the grid
     /// Returns true if movement was successful, false if collision occurred
+    #[inline(always)]
     pub fn move_forward(&mut self, grid: &mut Grid) -> bool {
         // Calculate new head position
         let new_head = self.snake.calculate_new_head();
@@ -136,6 +138,7 @@ impl GridAwareSnake {
     }
     
     /// Grow the snake, automatically updating the grid
+    #[inline(always)]
     pub fn grow(&mut self, grid: &mut Grid) {
         self.snake.grow();
         
@@ -146,12 +149,14 @@ impl GridAwareSnake {
     }
     
     /// Mark the snake as dead and clear it from the grid
+    #[inline(always)]
     pub fn die(&mut self, grid: &mut Grid) {
         self.snake.is_alive = false;
         self.clear_from_grid(grid);
     }
     
     /// Change direction (no grid update needed)
+    #[inline(always)]
     pub fn change_direction(&mut self, new_direction: Direction) {
         self.snake.change_direction(new_direction);
     }
@@ -177,6 +182,7 @@ impl GridAwareSnake {
     }
     
     /// Get snake head position
+    #[inline(always)]
     pub fn head(&self) -> Option<&Point> {
         self.snake.body.front()
     }
@@ -189,7 +195,7 @@ impl GridAwareSnake {
     }
     
     // Private helper methods
-    
+
     fn update_grid_with_body(&self, grid: &mut Grid) {
         for part in &self.snake.body {
             grid.set_cell(*part, Cell::Snake);

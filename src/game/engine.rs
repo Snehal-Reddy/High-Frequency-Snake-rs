@@ -98,7 +98,7 @@ impl GameState {
         }
     }
 
-    /// The main game loop - now much cleaner with automatic grid updates
+    /// The main game loop (hot path baby!)
     pub fn tick(&mut self, inputs: &[Input]) {
         // Process inputs and update snake directions
         for input in inputs {
@@ -107,7 +107,6 @@ impl GameState {
             }
         }
 
-        // Move snakes sequentially - collisions handled during movement
         let mut consumed_apples = 0;
         
         for snake in self.snakes.values_mut() {

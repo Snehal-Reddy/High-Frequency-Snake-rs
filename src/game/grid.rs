@@ -1,7 +1,7 @@
 use crate::game::types::Point;
 
-pub const GRID_WIDTH: usize = 1000;
-pub const GRID_HEIGHT: usize = 1000;
+pub const GRID_WIDTH: usize = 4000;
+pub const GRID_HEIGHT: usize = 4000;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Cell {
@@ -21,10 +21,12 @@ impl Grid {
         }
     }
 
+    #[inline(always)]
     pub fn get_cell(&self, point: &Point) -> Cell {
         self.cells[point.y as usize][point.x as usize]
     }
 
+    #[inline(always)]
     pub fn set_cell(&mut self, point: Point, cell: Cell) {
         self.cells[point.y as usize][point.x as usize] = cell;
     }

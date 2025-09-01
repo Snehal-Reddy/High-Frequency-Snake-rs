@@ -42,6 +42,7 @@ impl GridAwareApple {
     }
     
     /// Spawn the apple to the grid
+    #[inline(always)]
     pub fn spawn(&mut self, grid: &mut Grid) {
         if !self.is_spawned {
             grid.set_cell(self.apple.position, Cell::Apple);
@@ -50,6 +51,7 @@ impl GridAwareApple {
     }
     
     /// Consume the apple, removing it from the grid
+    #[inline(always)]
     pub fn consume(&mut self, grid: &mut Grid) {
         if self.is_spawned {
             grid.set_cell(self.apple.position, Cell::Empty);
