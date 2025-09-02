@@ -4,16 +4,19 @@ Measure cache and branch behavior across snake counts.
 - Runs: perf stat -e cache-misses,cache-references,branch-instructions,branch-misses
 - Bench target: cargo bench --bench game_bench -- "game_tick_max_inputs/{N}_snakes"
 - Parses stderr (perf output), sums across cpu_atom/cpu_core, computes miss rates
-- Prints a compact table and writes JSON summary to cache_branch_summary.json
+- Does multiple runs per snake count and averages results
+- Prints a compact table and writes JSON summary to perf_summary.json
 """
 
 import subprocess
 import json
 import re
+import statistics
 from typing import Dict, Any, List
 
-SNAKE_COUNTS = [100, 200, 300, 400, 500, 600, 700, 800, 900, 1000]
+SNAKE_COUNTS = [100, 300, 500, 700, 900, 1000]
 PERF_EVENTS = "cache-misses,cache-references,branch-instructions,branch-misses"
+RUNS_PER_SNAKE_COUNT = 5  # Number of runs per snake count
 
 # Column definitions: (header, width)
 COLUMNS = [
@@ -90,6 +93,62 @@ def run_perf_for_snakes(snake_count: int) -> Dict[str, Any]:
     }
 
 
+def run_multiple_perf_measurements(snake_count: int, runs: int = RUNS_PER_SNAKE_COUNT) -> Dict[str, Any]:
+    """Run multiple perf measurements and return averaged results"""
+    print(f"  Running {runs} measurements for {snake_count} snakes...")
+    
+    results = []
+    for run_num in range(runs):
+        print(f"    Run {run_num + 1}/{runs}...", end=" ", flush=True)
+        
+        try:
+            result = run_perf_for_snakes(snake_count)
+            results.append(result)
+            print("✓")
+        except Exception as e:
+            print(f"✗ Error: {e}")
+            continue
+    
+    if not results:
+        print(f"    No successful runs for {snake_count} snakes")
+        return {
+            "snakes": snake_count,
+            "cache_misses": 0,
+            "cache_references": 0,
+            "cache_miss_rate_percent": 0.0,
+            "branch_misses": 0,
+            "branch_instructions": 0,
+            "branch_miss_rate_percent": 0.0,
+            "time_elapsed_seconds": 0.0,
+            "runs_completed": 0,
+            "std_dev_cache_misses": 0.0,
+            "std_dev_branch_misses": 0.0,
+        }
+    
+    # Calculate averages
+    avg_result = {
+        "snakes": snake_count,
+        "cache_misses": int(statistics.mean(r["cache_misses"] for r in results)),
+        "cache_references": int(statistics.mean(r["cache_references"] for r in results)),
+        "cache_miss_rate_percent": statistics.mean(r["cache_miss_rate_percent"] for r in results),
+        "branch_misses": int(statistics.mean(r["branch_misses"] for r in results)),
+        "branch_instructions": int(statistics.mean(r["branch_instructions"] for r in results)),
+        "branch_miss_rate_percent": statistics.mean(r["branch_miss_rate_percent"] for r in results),
+        "time_elapsed_seconds": statistics.mean(r["time_elapsed_seconds"] for r in results) if results[0]["time_elapsed_seconds"] else None,
+        "runs_completed": len(results),
+    }
+    
+    # Calculate standard deviations if we have multiple runs
+    if len(results) > 1:
+        avg_result["std_dev_cache_misses"] = statistics.stdev(r["cache_misses"] for r in results)
+        avg_result["std_dev_branch_misses"] = statistics.stdev(r["branch_misses"] for r in results)
+    else:
+        avg_result["std_dev_cache_misses"] = 0.0
+        avg_result["std_dev_branch_misses"] = 0.0
+    
+    return avg_result
+
+
 def _fmt_header() -> str:
     parts: List[str] = []
     for header, width in COLUMNS:
@@ -112,6 +171,9 @@ def _fmt_row(res: Dict[str, Any]) -> str:
 
 def main() -> None:
     print("=== Measuring cache and branch metrics across snake counts ===")
+    print(f"Running {RUNS_PER_SNAKE_COUNT} measurements per snake count for reliability")
+    print()
+    
     results: List[Dict[str, Any]] = []
 
     # Header
@@ -120,16 +182,27 @@ def main() -> None:
     print("-" * len(header))
 
     for n in SNAKE_COUNTS:
-        res = run_perf_for_snakes(n)
+        print(f"\nMeasuring {n} snakes:")
+        res = run_multiple_perf_measurements(n, RUNS_PER_SNAKE_COUNT)
         results.append(res)
-        print(_fmt_row(res))
+        print(f"  Average results: {_fmt_row(res)}")
+        if res["runs_completed"] > 1:
+            print(f"  Std dev - Cache misses: {res['std_dev_cache_misses']:,.0f}, Branch misses: {res['std_dev_branch_misses']:,.0f}")
 
     # Save JSON summary
     out_file = "perf_summary.json"
     with open(out_file, "w") as f:
-        json.dump({"results": results}, f, indent=2)
+        json.dump({
+            "metadata": {
+                "runs_per_snake_count": RUNS_PER_SNAKE_COUNT,
+                "snake_counts": SNAKE_COUNTS,
+                "perf_events": PERF_EVENTS
+            },
+            "results": results
+        }, f, indent=2)
 
-    print("\nSaved summary to:", out_file)
+    print(f"\nSaved summary to: {out_file}")
+    print(f"Each snake count was measured {RUNS_PER_SNAKE_COUNT} times and averaged")
 
 
 if __name__ == "__main__":
