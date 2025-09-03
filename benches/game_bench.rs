@@ -1,6 +1,7 @@
 use criterion::{Criterion, criterion_group, criterion_main};
 use high_frequency_snake::game::{
     engine::GameState,
+    generator::{DeterministicGenerator, DeterministicConfig},
     types::{Direction, Input},
 };
 use rand::Rng;
@@ -165,6 +166,74 @@ fn game_state_init_bench(c: &mut Criterion) {
     group.finish();
 }
 
+/// Generate deterministic inputs for predictable outcomes
+fn generate_deterministic_inputs(num_snakes: usize, num_ticks: usize) -> Vec<Input> {
+    let mut inputs = Vec::new();
+    let death_group_size = num_snakes / 4;
+    let apple_group_size = num_snakes / 4;
+    
+    for tick in 0..num_ticks {
+        for snake_id in 0..num_snakes as u32 {
+            let direction = match snake_id {
+                // Death group: converging movement
+                id if (id as usize) < death_group_size => {
+                    if id % 2 == 0 {
+                        Direction::Right
+                    } else {
+                        Direction::Left
+                    }
+                },
+                // Apple group: zigzag search patterns
+                id if (id as usize) < death_group_size + apple_group_size => {
+                    match tick % 4 {
+                        0 => Direction::Right,
+                        1 => Direction::Down,
+                        2 => Direction::Left,
+                        _ => Direction::Up,
+                    }
+                },
+                // Safe group: linear movement
+                _ => {
+                    if tick % 10 == 9 {
+                        Direction::Down
+                    } else {
+                        Direction::Right
+                    }
+                },
+            };
+            
+            inputs.push(Input { snake_id, direction });
+        }
+    }
+    
+    inputs
+}
+
+/// Benchmark hot path performance with deterministic configuration
+/// This measures the actual game logic performance with predictable outcomes
+fn hot_path_bench(c: &mut Criterion) {
+    let mut group = c.benchmark_group("hot_path");
+
+    for num_snakes in (MIN_SNAKES..=MAX_SNAKES).step_by(SNAKE_STEP) {
+        group.bench_function(&format!("{}_snakes", num_snakes), |b| {
+            // Generate deterministic inputs outside measurement
+            let inputs = generate_deterministic_inputs(num_snakes, 1);
+            
+            // Measure only the game.tick() call, resetting state each iteration
+            b.iter_with_setup(|| {
+                // Setup fresh game state for each iteration
+                let config = DeterministicConfig::default();
+                DeterministicGenerator::generate_predictable_outcomes(num_snakes, config)
+            }, |mut game_state| {
+                // Measure the tick
+                black_box(game_state.tick(&inputs));
+            });
+        });
+    }
+
+    group.finish();
+}
+
 criterion_group!(
     benches,
     game_tick_no_inputs_bench,
@@ -172,6 +241,7 @@ criterion_group!(
     game_tick_heavy_inputs_bench,
     game_tick_max_inputs_bench,
     game_tick_latency_bench,
-    game_state_init_bench
+    game_state_init_bench,
+    hot_path_bench
 );
 criterion_main!(benches);
