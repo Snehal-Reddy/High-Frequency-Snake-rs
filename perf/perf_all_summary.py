@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """
-Measure cache and branch behavior across snake counts.
+Measure cache and branch behavior across snake counts using deterministic hot path benchmark.
 - Runs: perf stat -e cache-misses,cache-references,branch-instructions,branch-misses
-- Bench target: cargo bench --bench game_bench -- "game_tick_max_inputs/{N}_snakes"
+- Bench target: cargo bench --bench game_bench -- "hot_path/{N}_snakes"
+- Uses our deterministic benchmark with consistent CPU frequency and cache state
 - Parses stderr (perf output), sums across cpu_atom/cpu_core, computes miss rates
 - Does multiple runs per snake count and averages results
 - Prints a compact table and writes JSON summary to perf_summary.json
@@ -31,10 +32,10 @@ COLUMNS = [
 
 
 def run_perf_for_snakes(snake_count: int) -> Dict[str, Any]:
+    # Use our consistent benchmarking script that locks CPU frequency and handles cache state
     cmd = [
         "perf", "stat", "-e", PERF_EVENTS,
-        "cargo", "bench", "--bench", "game_bench", "--",
-        f"game_tick_max_inputs/{snake_count}_snakes",
+        "./benches/run_bench.sh", str(snake_count)
     ]
 
     proc = subprocess.run(cmd, capture_output=True, text=True)
@@ -171,6 +172,7 @@ def _fmt_row(res: Dict[str, Any]) -> str:
 
 def main() -> None:
     print("=== Measuring cache and branch metrics across snake counts ===")
+    print("Using deterministic hot_path benchmark with consistent CPU frequency and cache state")
     print(f"Running {RUNS_PER_SNAKE_COUNT} measurements per snake count for reliability")
     print()
     
@@ -196,7 +198,9 @@ def main() -> None:
             "metadata": {
                 "runs_per_snake_count": RUNS_PER_SNAKE_COUNT,
                 "snake_counts": SNAKE_COUNTS,
-                "perf_events": PERF_EVENTS
+                "perf_events": PERF_EVENTS,
+                "benchmark": "hot_path",
+                "description": "Deterministic hot path benchmark with consistent CPU frequency and cache state"
             },
             "results": results
         }, f, indent=2)

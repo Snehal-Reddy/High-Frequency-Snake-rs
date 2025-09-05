@@ -43,8 +43,31 @@ ACTUAL_USER=${SUDO_USER:-$USER}
 echo "Running benchmark as user: $ACTUAL_USER"
 echo "CPU settings are locked to 4.0 GHz on core 0"
 
+# Parse arguments
+SNAKE_COUNT=1000  # Default snake count
+COLD_CACHE=false
+
+for arg in "$@"; do
+    case $arg in
+        --cold-cache)
+            COLD_CACHE=true
+            ;;
+        --snakes=*)
+            SNAKE_COUNT="${arg#*=}"
+            ;;
+        *)
+            # If it's just a number, treat it as snake count
+            if [[ $arg =~ ^[0-9]+$ ]]; then
+                SNAKE_COUNT=$arg
+            fi
+            ;;
+    esac
+done
+
+echo "Running benchmark with $SNAKE_COUNT snakes"
+
 # Check if we want cold cache measurement
-if [ "$1" = "--cold-cache" ]; then
+if [ "$COLD_CACHE" = true ]; then
     echo "=== COLD CACHE BENCHMARK ==="
     echo "Clearing kernel caches..."
     echo 3 | sudo tee /proc/sys/vm/drop_caches > /dev/null
@@ -56,14 +79,14 @@ if [ "$1" = "--cold-cache" ]; then
     
     # Hmm not sure if this is actually helping clearing cache, but care about hot cache anyway
     echo "Running cold cache benchmark..."
-    sudo -u $ACTUAL_USER taskset -c 0 /home/boopop/.cargo/bin/cargo bench --bench game_bench hot_path/1000_snakes
+    sudo -u $ACTUAL_USER taskset -c 0 /home/boopop/.cargo/bin/cargo bench --bench game_bench hot_path/${SNAKE_COUNT}_snakes
 else
     echo "=== WARM CACHE BENCHMARK ==="
     echo "Running warm-up benchmark (discarding result)..."
-    sudo -u $ACTUAL_USER taskset -c 0 /home/boopop/.cargo/bin/cargo bench --bench game_bench hot_path/1000_snakes > /dev/null 2>&1
+    sudo -u $ACTUAL_USER taskset -c 0 /home/boopop/.cargo/bin/cargo bench --bench game_bench hot_path/${SNAKE_COUNT}_snakes > /dev/null 2>&1
     
     echo "Running actual benchmark (measuring this result)..."
-    sudo -u $ACTUAL_USER taskset -c 0 /home/boopop/.cargo/bin/cargo bench --bench game_bench hot_path/1000_snakes
+    sudo -u $ACTUAL_USER taskset -c 0 /home/boopop/.cargo/bin/cargo bench --bench game_bench hot_path/${SNAKE_COUNT}_snakes
 fi
 
 echo "Benchmark completed"

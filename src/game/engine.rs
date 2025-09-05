@@ -1,16 +1,15 @@
 use crate::game::{
     apple::{APPLE_CAPACITY, Apple, GridAwareApple},
-    grid::{self, GRID_HEIGHT, GRID_WIDTH, Grid},
+    grid::{self, Grid},
     snake::{SNAKE_CAPACITY, Snake, GridAwareSnake},
     types::{Input, Point},
 };
 use grid::Cell;
 use rand::Rng;
-use std::collections::HashMap;
 
 pub struct GameState {
     // Using wrapper types that automatically manage grid updates
-    pub snakes: HashMap<u32, GridAwareSnake>,
+    pub snakes: Vec<GridAwareSnake>,
     pub apples: Vec<GridAwareApple>,
     pub grid: Grid,
 }
@@ -18,7 +17,7 @@ pub struct GameState {
 impl GameState {
     // clean this shit up
     pub fn random() -> Self {
-        let mut random_snakes = HashMap::<u32, GridAwareSnake>::with_capacity(SNAKE_CAPACITY);
+        let mut random_snakes = Vec::< GridAwareSnake>::with_capacity(SNAKE_CAPACITY);
         let mut grid = Grid::new();
         let mut rng = rand::rng();
 
@@ -61,7 +60,7 @@ impl GameState {
 
             // Add snake to the game state using wrapper
             let grid_aware_snake = GridAwareSnake::new(snake, &mut grid);
-            random_snakes.insert(index as u32, grid_aware_snake);
+            random_snakes.push(grid_aware_snake);
         }
 
         // Spawn apples in empty spaces
@@ -92,8 +91,8 @@ impl GameState {
     
     pub fn new() -> Self {
         Self {
-            snakes: HashMap::with_capacity(SNAKE_CAPACITY),
-            apples: Vec::with_capacity(APPLE_CAPACITY),
+            snakes: Vec::<GridAwareSnake>::with_capacity(SNAKE_CAPACITY),
+            apples: Vec::<GridAwareApple>::with_capacity(APPLE_CAPACITY),
             grid: Grid::new(),
         }
     }
@@ -101,15 +100,21 @@ impl GameState {
     /// The main game loop (hot path baby!)
     pub fn tick(&mut self, inputs: &[Input]) {
         // Process inputs and update snake directions
+        // TODO: Wonder if sorting inputs will be faster for cache?
         for input in inputs {
-            if let Some(snake) = self.snakes.get_mut(&input.snake_id) {
-                snake.change_direction(input.direction);
-            }
+            // Processing dead snakes as well, do not want to add a branch.
+            // TODO: Bounds check?
+            self.snakes[input.snake_id as usize].change_direction(input.direction);
         }
 
         let mut consumed_apples = 0;
         
-        for snake in self.snakes.values_mut() {
+        for snake in self.snakes.iter_mut() {
+            // Branch prediction might have a headache with this.
+            if !snake.is_alive() {
+                continue;
+            }
+
             // Check for apple consumption before moving
             let will_eat_apple = if snake.head().is_some() {
                 let new_head = snake.snake().calculate_new_head();
@@ -144,9 +149,6 @@ impl GameState {
                 self.spawn_apple();
             }
         }
-
-        // Cleanup dead snakes (grid cleanup already happened in die())
-        self.snakes.retain(|_id, snake| snake.is_alive());
     }
 
     /// Add an apple to the game state (grid update happens automatically)

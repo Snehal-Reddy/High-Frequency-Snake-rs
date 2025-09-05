@@ -7,7 +7,6 @@ use crate::game::{
 };
 use grid::Cell;
 use rand::Rng;
-use std::collections::HashMap;
 
 #[derive(Clone, Copy)]
 pub struct DeterministicConfig {
@@ -37,7 +36,7 @@ pub struct DeterministicGenerator;
 impl DeterministicGenerator {
     pub fn generate(num_snakes: usize, config: DeterministicConfig) -> GameState {
         let mut grid = Grid::new();
-        let mut snakes = HashMap::new();
+        let mut snakes = Vec::<GridAwareSnake>::with_capacity(num_snakes);
         let mut apples = Vec::new();
         
         // Calculate spacing based on snake count and grid size
@@ -57,7 +56,7 @@ impl DeterministicGenerator {
                 snake.grow();
             }
             let grid_aware_snake = GridAwareSnake::new(snake, &mut grid);
-            snakes.insert(i as u32, grid_aware_snake);
+            snakes.push(grid_aware_snake);
         }
         
         // Place apples in remaining spaces
@@ -82,7 +81,7 @@ impl DeterministicGenerator {
     /// - 50% of snakes will remain unchanged (safe movement)
     pub fn generate_predictable_outcomes(num_snakes: usize, config: DeterministicConfig) -> GameState {
         let mut grid = Grid::new();
-        let mut snakes = HashMap::new();
+        let mut snakes = Vec::<GridAwareSnake>::with_capacity(num_snakes);
         let mut apples = Vec::new();
         
         // Calculate group sizes
@@ -109,7 +108,7 @@ impl DeterministicGenerator {
                 snake.grow();
             }
             let grid_aware_snake = GridAwareSnake::new(snake, &mut grid);
-            snakes.insert(i as u32, grid_aware_snake);
+            snakes.push(grid_aware_snake);
         }
         
         // Place apples first, then place apple group snakes next to them
@@ -146,7 +145,7 @@ impl DeterministicGenerator {
                 snake.grow();
             }
             let grid_aware_snake = GridAwareSnake::new(snake, &mut grid);
-            snakes.insert(idx as u32, grid_aware_snake);
+            snakes.push(grid_aware_snake);
         }
         
         // Place safe group snakes (will survive) - far from others
@@ -162,7 +161,7 @@ impl DeterministicGenerator {
                 snake.grow();
             }
             let grid_aware_snake = GridAwareSnake::new(snake, &mut grid);
-            snakes.insert(idx as u32, grid_aware_snake);
+            snakes.push(grid_aware_snake);
         }
         
         // Add some additional random apples if we have capacity
@@ -191,7 +190,7 @@ impl DeterministicGenerator {
         }
         
         // Check if snakes are reasonably spaced (not all clumped together)
-        let mut positions: Vec<_> = game_state.snakes.values()
+        let positions: Vec<_> = game_state.snakes.iter()
             .map(|s| s.head().copied().unwrap_or(Point { x: 0, y: 0 }))
             .collect();
         
@@ -289,9 +288,9 @@ impl DeterministicGenerator {
         positions
     }
     
-    fn calculate_apple_positions(grid: &Grid, seed: u64) -> Vec<Point> {
+    fn calculate_apple_positions(grid: &Grid, _seed: u64) -> Vec<Point> {
         let mut positions = Vec::new();
-        let mut rng = rand::rng(); // TODO: Use seeded RNG for true determinism
+        // TODO: Use seeded RNG for true determinism
         
         // Calculate how many apples we want (reasonable ratio to empty space)
         let empty_cells = GRID_WIDTH * GRID_HEIGHT - 100; // Approximate empty cells after snakes
@@ -335,9 +334,9 @@ impl DeterministicGenerator {
         positions
     }
     
-    fn calculate_strategic_apple_positions(grid: &Grid, seed: u64, snakes: &HashMap<u32, GridAwareSnake>) -> Vec<Point> {
+    fn calculate_strategic_apple_positions(grid: &Grid, _seed: u64, snakes: &Vec<GridAwareSnake>) -> Vec<Point> {
         let mut positions = Vec::new();
-        let mut rng = rand::rng(); // TODO: Use seeded RNG for true determinism
+        // TODO: Use seeded RNG for true determinism
         
         // Calculate how many apples we want
         let empty_cells = GRID_WIDTH * GRID_HEIGHT - snakes.len() * 3; // Approximate empty cells after snakes
@@ -387,7 +386,7 @@ pub struct RandomGenerator;
 
 impl RandomGenerator {
     pub fn generate() -> GameState {
-        let mut random_snakes = HashMap::<u32, GridAwareSnake>::with_capacity(SNAKE_CAPACITY);
+        let mut random_snakes = Vec::<GridAwareSnake>::with_capacity(SNAKE_CAPACITY);
         let mut grid = Grid::new();
         let mut rng = rand::rng();
 
@@ -430,7 +429,7 @@ impl RandomGenerator {
 
             // Add snake to the game state using wrapper
             let grid_aware_snake = GridAwareSnake::new(snake, &mut grid);
-            random_snakes.insert(index as u32, grid_aware_snake);
+            random_snakes.push(grid_aware_snake);
         }
 
         // Spawn apples in empty spaces
