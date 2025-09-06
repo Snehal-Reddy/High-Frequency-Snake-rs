@@ -74,10 +74,10 @@ impl DeterministicGenerator {
         }
     }
     
-    /// Generate a deterministic game state with predictable outcomes
+    /// Generate a deterministic game state with predictable outcomes in a single tick
     /// This creates a configuration where:
-    /// - 25% of snakes will die (collide with each other)
-    /// - 25% of snakes will grow (consume apples)
+    /// - 25% of snakes will die (collide with each other immediately)
+    /// - 25% of snakes will grow (consume apples immediately)
     /// - 50% of snakes will remain unchanged (safe movement)
     pub fn generate_predictable_outcomes(num_snakes: usize, config: DeterministicConfig) -> GameState {
         let mut grid = Grid::new();
@@ -89,17 +89,17 @@ impl DeterministicGenerator {
         let apple_group_size = num_snakes / 4; // 25%
         let safe_group_size = num_snakes - death_group_size - apple_group_size; // 50%
         
-        // Place death group snakes (will collide) - close together
+        // Place death group snakes (will collide) - 1 unit apart for immediate collision
         let death_start_x = 100;
         let death_start_y = 100;
         for i in 0..death_group_size {
-            // Place snakes in pairs that will collide
+            // Place snakes in pairs that will collide in a single tick
             let (x, y, initial_direction) = if i % 2 == 0 {
                 // Even snakes start on the left, moving right
                 (death_start_x, death_start_y + (i / 2) * 10, Direction::Right)
             } else {
-                // Odd snakes start on the right, moving left
-                (death_start_x + 10, death_start_y + (i / 2) * 10, Direction::Left)
+                // Odd snakes start on the right, moving left - only 1 unit apart!
+                (death_start_x + 1, death_start_y + (i / 2) * 10, Direction::Left)
             };
             
             let pos = Point { x: x as u16, y: y as u16 };
@@ -126,10 +126,10 @@ impl DeterministicGenerator {
             apples.push(grid_aware_apple);
         }
         
-        // Place apple group snakes
+        // Place apple group snakes directly adjacent to apples for immediate consumption
         for i in 0..apple_group_size {
             let snake_x = if i < apples_to_place {
-                // Place next to apple if apple exists
+                // Place directly adjacent to apple (1 unit to the left) for immediate consumption
                 let apple_x = apple_start_x + (i % 10) * 20;
                 apple_x.saturating_sub(1)
             } else {
