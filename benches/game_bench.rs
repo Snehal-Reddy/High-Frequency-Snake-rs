@@ -1,4 +1,4 @@
-use criterion::{Criterion, criterion_group, criterion_main};
+use criterion::{Criterion, criterion_group, criterion_main, BatchSize};
 use high_frequency_snake::game::{
     engine::GameState,
     generator::{DeterministicGenerator, DeterministicConfig},
@@ -219,15 +219,18 @@ fn hot_path_bench(c: &mut Criterion) {
             // Generate deterministic inputs outside measurement
             let inputs = generate_deterministic_inputs(num_snakes, 1);
             
-            // Measure only the game.tick() call, resetting state each iteration
-            b.iter_with_setup(|| {
-                // Setup fresh game state for each iteration
-                let config = DeterministicConfig::default();
-                DeterministicGenerator::generate_predictable_outcomes(num_snakes, config)
-            }, |mut game_state| {
-                // Measure the tick
-                black_box(game_state.tick(&inputs));
-            });
+            // Use iter_batched_ref for expensive setup costs
+            b.iter_batched_ref(
+                || {
+                    let config = DeterministicConfig::default();
+                    DeterministicGenerator::generate_predictable_outcomes(num_snakes, config)
+                },
+                |game_state| {
+                    // Benchmark function - IS measured
+                    black_box(game_state.tick(&inputs));
+                },
+                BatchSize::LargeInput,
+            );
         });
     }
 
