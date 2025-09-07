@@ -1,4 +1,6 @@
 #!/bin/bash
+# WARNING: This script is deprecated. Use bench/run_bench.sh instead.
+# This measures pipeline metrics for setup as well!
 
 # CPU Pipeline Performance Measurement Script
 # Usage: ./measure_pipeline.sh <snake_count>

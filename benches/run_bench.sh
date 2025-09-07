@@ -46,11 +46,15 @@ echo "CPU settings are locked to 4.0 GHz on core 0"
 # Parse arguments
 SNAKE_COUNT=1000  # Default snake count
 COLD_CACHE=false
+PERF_COUNTERS=false
 
 for arg in "$@"; do
     case $arg in
         --cold-cache)
             COLD_CACHE=true
+            ;;
+        --perf-counters)
+            PERF_COUNTERS=true
             ;;
         --snakes=*)
             SNAKE_COUNT="${arg#*=}"
@@ -66,8 +70,12 @@ done
 
 echo "Running benchmark with $SNAKE_COUNT snakes"
 
-# Check if we want cold cache measurement
-if [ "$COLD_CACHE" = true ]; then
+# Check if we want performance counters measurement
+if [ "$PERF_COUNTERS" = true ]; then
+    echo "=== PERFORMANCE COUNTERS BENCHMARK ==="
+    echo "Running performance counters benchmark..."
+    sudo -u $ACTUAL_USER taskset -c 0 /home/boopop/.cargo/bin/cargo bench --bench perf_counters_bench perf_counters/${SNAKE_COUNT}_snakes
+elif [ "$COLD_CACHE" = true ]; then
     echo "=== COLD CACHE BENCHMARK ==="
     echo "Clearing kernel caches..."
     echo 3 | sudo tee /proc/sys/vm/drop_caches > /dev/null

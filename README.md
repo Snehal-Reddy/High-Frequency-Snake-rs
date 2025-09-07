@@ -11,7 +11,7 @@ This is an active project focused on learning low-level Rust optimizations. The 
 
 Learn and experiment with low-level optimization techniques in Rust applying them to a game server that pushes tick rates to extreme limits.
 
-**Target Performance**: 20,000+ ticks per second (0.05ms per tick) with 1000+ concurrent snakes.
+**Target Performance**: 200,000+ ticks per second (5 microseconds per tick) with 1000+ concurrent snakes.
 
 ## Game Concept
 
@@ -58,17 +58,18 @@ The application runs as a single process with two dedicated threads pinned to se
   - SPSC queue throughput and latency benchmarks
   - Game logic performance benchmarks
   - Integrated hot path measurements
+  - Hardware performance counter benchmarks
 - ✅ **Real-time Profiling**: CPU cycle-accurate measurements using `_rdtsc()`
 - ✅ **Performance Metrics**: Ticks per second, hot path latency, consume vs tick breakdown
-- ✅ **Cache Performance Analysis**: L1/L2/L3 cache hit rates and memory access patterns
+- ✅ **Cache Performance Analysis**: cache hit rates and memory access patterns
 - ✅ **Branch Prediction Analysis**: Branch misprediction rates and optimization opportunities
 
 ### Benchmark Categories
 - **SPSC Benchmarks**: Queue throughput, latency, and contention testing
 - **Game Benchmarks**: Pure game logic performance with varying snake counts and input loads
 - **Integrated Benchmarks**: Complete hot path measurement (consume + tick) with pinned threads
-- **Cache Benchmarks**: Memory access pattern analysis and cache efficiency measurements
-- **Branch Prediction Benchmarks**: Conditional branch performance and optimization validation
+- **Performance Counter Benchmarks**: Hardware-level cache hit rates, branch prediction, and IPC measurements
+- **Comprehensive Analysis**: Multi-run statistical analysis across snake counts with JSON output
 
 ## Performance Constraints
 
@@ -105,6 +106,12 @@ cargo bench --bench game_bench
 
 # Integrated hot path performance
 cargo bench --bench integrated_bench
+
+# Hardware performance counters (cache hit rate, branch prediction, IPC)
+cargo bench --bench perf_counters_bench
+
+# Comprehensive performance analysis across snake counts
+cd benches && python3 perf_summary.py
 ```
 
 ### Profiling Output
@@ -120,20 +127,25 @@ Tick 2000: 10653.39 ticks/sec | Consume: avg=24056 cycles, min=4450 cycles, max=
 
 ### Performance Analysis Tools
 
-**Cache Performance Measurement:**
+**Hardware Performance Counters:**
 ```bash
-./perf/measure_cache.sh
+# Single snake count analysis
+cargo bench --bench perf_counters_bench perf_counters/100_snakes
+
+# All snake counts with statistical analysis
+cd benches && python3 perf_summary.py
 ```
 
-**Pipeline Performance Analysis:**
+**Legacy Performance Tools (perf directory):**
 ```bash
+# Cache performance measurement
+./perf/measure_cache.sh
+
+# Pipeline performance analysis  
 ./perf/measure_pipeline.sh
 ```
 
-**Comprehensive Performance Report:**
-```bash
-python3 perf/perf_all_summary.py
-```
+**Note**: The new `perf_counters_bench` and `perf_summary.py` provide more integrated and reliable performance analysis. See `benches/README.md` for detailed usage.
 
 ## Project Structure
 
@@ -155,13 +167,15 @@ src/
 benches/                 # Performance benchmarks
 ├── spsc_bench.rs        # SPSC queue performance tests
 ├── game_bench.rs        # Game logic performance tests
-└── integrated_bench.rs  # Complete hot path measurements
+├── integrated_bench.rs  # Complete hot path measurements
+├── perf_counters_bench.rs # Hardware performance counter benchmarks
+├── perf_summary.py      # Comprehensive performance analysis script
+├── run_bench.sh         # Benchmark runner with various options
+└── README.md            # Detailed benchmark documentation
 
-perf/                    # Performance analysis tools
-├── debug_perf.py        # Performance debugging utilities
+perf/                    # Legacy performance analysis tools
 ├── measure_cache.sh     # Cache performance measurement scripts
 ├── measure_pipeline.sh  # Pipeline performance analysis
-├── perf_all_summary.py  # Comprehensive performance reporting
 └── perf_summary.json    # Performance metrics database
 ```
 

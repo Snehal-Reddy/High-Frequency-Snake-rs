@@ -1,4 +1,6 @@
 #!/bin/bash
+# WARNING: This script is deprecated. Use bench/run_bench.sh instead.
+# This measures cache metrics for setup as well!
 
 # Cache Performance Measurement Script
 # Usage: ./measure_cache.sh <snake_count>
