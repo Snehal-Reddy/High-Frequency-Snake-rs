@@ -1,5 +1,6 @@
 use crate::game::grid::{GRID_HEIGHT, GRID_WIDTH, Cell, Grid};
 use crate::game::types::{Direction, Point};
+use crossbeam_utils::CachePadded;
 use std::collections::VecDeque;
 
 pub const SNAKE_CAPACITY: usize = 1024;
@@ -92,13 +93,13 @@ impl Snake {
 
 /// Smart wrapper around Snake that automatically manages grid updates
 pub struct GridAwareSnake {
-    snake: Snake,
+    snake: CachePadded<Snake>,
 }
 
 impl GridAwareSnake {
     /// Create a new GridAwareSnake. The snake will be added to the grid immediately.
     pub fn new(snake: Snake, grid: &mut Grid) -> Self {
-        let mut wrapper = Self { snake };
+        let mut wrapper = Self { snake: CachePadded::new(snake) };
         
         // Add initial snake body to grid
         wrapper.update_grid_with_body(grid);

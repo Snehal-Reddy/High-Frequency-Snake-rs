@@ -75,7 +75,7 @@ mod tests {
         assert!(game.snakes[0].body().len() > initial_snake_length);
         
         // There should be at least one apple (the original was consumed and new ones spawned)
-        assert!(game.apples.len() >= 1);
+        assert!(game.num_apples >= 1);
     }
 
     #[test]
@@ -165,11 +165,8 @@ mod tests {
             }
         }
 
-        // Verify all apples are within grid bounds
-        for apple in &game.apples {
-            assert!(apple.position().x < GRID_WIDTH as u16);
-            assert!(apple.position().y < GRID_HEIGHT as u16);
-        }
+        // Verify apple count is reasonable
+        assert!(game.num_apples <= crate::game::apple::APPLE_CAPACITY as u64);
 
         // Verify grid consistency
         for snake in game.snakes.iter() {
@@ -178,9 +175,17 @@ mod tests {
             }
         }
 
-        for apple in &game.apples {
-            assert_eq!(game.grid.get_cell(&apple.position()), Cell::Apple);
+        // Verify apples exist in grid (count them)
+        let mut apple_count = 0;
+        for y in 0..GRID_HEIGHT {
+            for x in 0..GRID_WIDTH {
+                let pos = Point { x: x as u16, y: y as u16 };
+                if game.grid.get_cell(&pos) == Cell::Apple {
+                    apple_count += 1;
+                }
+            }
         }
+        assert_eq!(apple_count, game.num_apples as usize);
     }
 
     #[test]
@@ -312,15 +317,7 @@ mod tests {
         let grid_aware_snake = crate::game::snake::GridAwareSnake::new(snake, &mut game.grid);
         game.snakes.push(grid_aware_snake);
 
-        // Test input for non-existent snake (use index beyond vector length)
-        let invalid_input = crate::game::types::Input {
-            snake_id: 999,
-            direction: Direction::Up,
-        };
-
-        // Should not panic (but will panic due to index out of bounds)
-        // This test needs to be updated to handle the vector approach
-        // For now, let's test with a valid snake ID
+        // Test with a valid snake ID (invalid input would panic due to index out of bounds)
         let valid_input = crate::game::types::Input {
             snake_id: 0,
             direction: Direction::Up,
@@ -367,9 +364,10 @@ mod tests {
         ];
 
         for (start_pos, direction, expected_pos) in test_cases {
-            let mut snake = Snake::new(1, start_pos, direction);
-            snake.move_forward();
-            let new_head = *snake.body.front().unwrap();
+            let snake = Snake::new(1, start_pos, direction);
+            let mut test_snake = snake;
+            test_snake.move_forward();
+            let new_head = *test_snake.body.front().unwrap();
             assert_eq!(new_head, expected_pos);
         }
     }
@@ -384,14 +382,14 @@ mod tests {
             game.add_apple(apple);
         }
 
-        let initial_apple_count = game.apples.len();
+        let initial_apple_count = game.num_apples;
         
         // Try to add one more apple
         let extra_apple = Apple::new(Point { x: 999, y: 999 });
         game.add_apple(extra_apple);
 
         // Apple count should not increase
-        assert_eq!(game.apples.len(), initial_apple_count);
+        assert_eq!(game.num_apples, initial_apple_count);
     }
 
     #[test]
@@ -527,8 +525,6 @@ mod tests {
             game.add_apple(apple);
         }
 
-        let initial_snake_count = game.snakes.len();
-
         // Run complex scenario
         for tick in 0..20 {
             // Create some inputs
@@ -579,9 +575,17 @@ mod tests {
                 }
             }
             
-            for apple in &game.apples {
-                assert_eq!(game.grid.get_cell(&apple.position()), Cell::Apple);
+            // Verify apples exist in grid (count them)
+            let mut apple_count = 0;
+            for y in 0..GRID_HEIGHT {
+                for x in 0..GRID_WIDTH {
+                    let pos = Point { x: x as u16, y: y as u16 };
+                    if game.grid.get_cell(&pos) == Cell::Apple {
+                        apple_count += 1;
+                    }
+                }
             }
+            assert_eq!(apple_count, game.num_apples as usize);
         }
     }
 

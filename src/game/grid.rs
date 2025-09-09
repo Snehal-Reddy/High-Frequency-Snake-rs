@@ -1,7 +1,7 @@
 use crate::game::types::Point;
 
-pub const GRID_WIDTH: usize = 4000;
-pub const GRID_HEIGHT: usize = 4000;
+pub const GRID_WIDTH: usize = 10_000;
+pub const GRID_HEIGHT: usize = 10_000;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Cell {

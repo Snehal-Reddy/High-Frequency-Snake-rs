@@ -14,6 +14,7 @@ impl Apple {
 }
 
 /// Smart wrapper around Apple that automatically manages grid updates
+/// NOTE: This is primarily used for testing. The main game engine uses grid-only apple storage.
 pub struct GridAwareApple {
     apple: Apple,
     is_spawned: bool,
@@ -22,7 +23,7 @@ pub struct GridAwareApple {
 impl GridAwareApple {
     /// Create a new GridAwareApple. The apple will be added to the grid immediately.
     pub fn new(apple: Apple, grid: &mut Grid) -> Self {
-        let mut wrapper = Self {
+        let wrapper = Self {
             apple,
             is_spawned: true,
         };

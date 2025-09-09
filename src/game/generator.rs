@@ -1,11 +1,10 @@
 use crate::game::{
-    apple::{APPLE_CAPACITY, Apple, GridAwareApple},
+    apple::{APPLE_CAPACITY, Apple},
     engine::GameState,
-    grid::{self, GRID_HEIGHT, GRID_WIDTH, Grid},
+    grid::{Cell, GRID_HEIGHT, GRID_WIDTH, Grid},
     snake::{SNAKE_CAPACITY, Snake, GridAwareSnake},
     types::{Direction, Point},
 };
-use grid::Cell;
 use rand::Rng;
 
 #[derive(Clone, Copy)]
@@ -37,7 +36,7 @@ impl DeterministicGenerator {
     pub fn generate(num_snakes: usize, config: DeterministicConfig) -> GameState {
         let mut grid = Grid::new();
         let mut snakes = Vec::<GridAwareSnake>::with_capacity(num_snakes);
-        let mut apples = Vec::new();
+        let mut num_apples = 0;
         
         // Calculate spacing based on snake count and grid size
         let spacing = Self::calculate_snake_spacing(num_snakes);
@@ -62,14 +61,15 @@ impl DeterministicGenerator {
         // Place apples in remaining spaces
         let apple_positions = Self::calculate_apple_positions(&grid, config.seed);
         for pos in apple_positions {
-            let apple = Apple::new(pos);
-            let grid_aware_apple = GridAwareApple::new(apple, &mut grid);
-            apples.push(grid_aware_apple);
+            if num_apples < APPLE_CAPACITY as u64 {
+                grid.set_cell(pos, Cell::Apple);
+                num_apples += 1;
+            }
         }
         
         GameState {
             snakes,
-            apples,
+            num_apples,
             grid,
         }
     }
@@ -82,7 +82,7 @@ impl DeterministicGenerator {
     pub fn generate_predictable_outcomes(num_snakes: usize, config: DeterministicConfig) -> GameState {
         let mut grid = Grid::new();
         let mut snakes = Vec::<GridAwareSnake>::with_capacity(num_snakes);
-        let mut apples = Vec::new();
+        let mut num_apples = 0;
         
         // Calculate group sizes
         let death_group_size = num_snakes / 4; // 25%
@@ -121,9 +121,8 @@ impl DeterministicGenerator {
             let apple_x = apple_start_x + (i % 10) * 20;
             let apple_y = apple_start_y + (i / 10) * 20;
             let apple_pos = Point { x: apple_x as u16, y: apple_y as u16 };
-            let apple = Apple::new(apple_pos);
-            let grid_aware_apple = GridAwareApple::new(apple, &mut grid);
-            apples.push(grid_aware_apple);
+            grid.set_cell(apple_pos, Cell::Apple);
+            num_apples += 1;
         }
         
         // Place apple group snakes directly adjacent to apples for immediate consumption
@@ -165,18 +164,17 @@ impl DeterministicGenerator {
         }
         
         // Add some additional random apples if we have capacity
-        if apples.len() < APPLE_CAPACITY {
+        if num_apples < APPLE_CAPACITY as u64 {
             let additional_apple_positions = Self::calculate_apple_positions(&grid, config.seed);
-            for pos in additional_apple_positions.iter().take(APPLE_CAPACITY - apples.len()) {
-                let apple = Apple::new(*pos);
-                let grid_aware_apple = GridAwareApple::new(apple, &mut grid);
-                apples.push(grid_aware_apple);
+            for pos in additional_apple_positions.iter().take((APPLE_CAPACITY as u64 - num_apples) as usize) {
+                grid.set_cell(*pos, Cell::Apple);
+                num_apples += 1;
             }
         }
         
         GameState {
             snakes,
-            apples,
+            num_apples,
             grid,
         }
     }
@@ -212,24 +210,23 @@ impl DeterministicGenerator {
         }
         
         // Check if we have reasonable number of apples
-        let active_apples = game_state.apples.iter().filter(|a| a.is_spawned()).count();
-        if active_apples == 0 {
-            println!("❌ No active apples in game state");
+        if game_state.num_apples == 0 {
+            println!("❌ No apples in game state");
             return false;
         }
         
-        if active_apples > APPLE_CAPACITY {
-            println!("❌ Too many active apples: {} > {}", active_apples, APPLE_CAPACITY);
+        if game_state.num_apples > APPLE_CAPACITY as u64 {
+            println!("❌ Too many apples: {} > {}", game_state.num_apples, APPLE_CAPACITY);
             return false;
         }
         
         println!("✅ Valid game state: {} snakes, {} apples, min distance = {}", 
-                game_state.snakes.len(), active_apples, min_distance);
+                game_state.snakes.len(), game_state.num_apples, min_distance);
         true
     }
     
     fn calculate_snake_spacing(num_snakes: usize) -> usize {
-        // For 4000x4000 grid = 16,000,000 total cells
+        // For 10000x10000 grid = 100,000,000 total cells
         // If we want snakes to be reasonably spaced:
         let total_cells = GRID_WIDTH * GRID_HEIGHT;
         let available_cells = total_cells / 2; // Leave space for apples and snake bodies
@@ -263,7 +260,7 @@ impl DeterministicGenerator {
             y: (GRID_HEIGHT / 2) as u16 
         };
         let mut radius = 2;
-        let mut angle_step = 2.0 * std::f64::consts::PI / num_snakes as f64;
+        let angle_step = 2.0 * std::f64::consts::PI / num_snakes as f64;
         
         for i in 0..num_snakes {
             let angle = i as f64 * angle_step;
@@ -334,52 +331,6 @@ impl DeterministicGenerator {
         positions
     }
     
-    fn calculate_strategic_apple_positions(grid: &Grid, _seed: u64, snakes: &Vec<GridAwareSnake>) -> Vec<Point> {
-        let mut positions = Vec::new();
-        // TODO: Use seeded RNG for true determinism
-        
-        // Calculate how many apples we want
-        let empty_cells = GRID_WIDTH * GRID_HEIGHT - snakes.len() * 3; // Approximate empty cells after snakes
-        let target_apples = (empty_cells / 1000).min(APPLE_CAPACITY); // 1 apple per 1000 empty cells, max 128
-        
-        // Place apples strategically near apple group snakes
-        let mut apple_count = 0;
-        let mut count = 0;
-        
-        for y in 0..GRID_HEIGHT {
-            for x in 0..GRID_WIDTH {
-                let pos = Point { x: x as u16, y: y as u16 };
-                if grid.get_cell(&pos) == Cell::Empty {
-                    if count % 1000 == 0 && apple_count < target_apples { // Every 1000th empty cell
-                        positions.push(pos);
-                        apple_count += 1;
-                    }
-                    count += 1;
-                }
-            }
-        }
-        
-        // If we didn't get enough apples, add more with larger spacing
-        if apple_count < target_apples {
-            count = 0;
-            for y in 0..GRID_HEIGHT {
-                for x in 0..GRID_WIDTH {
-                    let pos = Point { x: x as u16, y: y as u16 };
-                    if grid.get_cell(&pos) == Cell::Empty {
-                        if count % 500 == 0 && apple_count < target_apples { // Every 500th empty cell
-                            if !positions.contains(&pos) {
-                                positions.push(pos);
-                                apple_count += 1;
-                            }
-                        }
-                        count += 1;
-                    }
-                }
-            }
-        }
-        
-        positions
-    }
 }
 
 pub struct RandomGenerator;
@@ -389,6 +340,7 @@ impl RandomGenerator {
         let mut random_snakes = Vec::<GridAwareSnake>::with_capacity(SNAKE_CAPACITY);
         let mut grid = Grid::new();
         let mut rng = rand::rng();
+        let mut num_apples = 0;
 
         // Spawn snakes with collision detection
         for index in 0..SNAKE_CAPACITY {
@@ -422,7 +374,7 @@ impl RandomGenerator {
                 if attempts > 1000 {
                     // Fallback: create a minimal snake if we can't find space
                     let start_pos = Point { x: 0, y: 0 };
-                    let mut snake = Snake::new(index as u32, start_pos, rng.random());
+                    let snake = Snake::new(index as u32, start_pos, rng.random());
                     break snake;
                 }
             };
@@ -433,14 +385,13 @@ impl RandomGenerator {
         }
 
         // Spawn apples in empty spaces
-        let mut random_apples = Vec::<GridAwareApple>::with_capacity(APPLE_CAPACITY);
         for _ in 0..APPLE_CAPACITY {
             let mut attempts = 0;
             loop {
                 let apple = Apple::new(rng.random());
                 if grid.get_cell(&apple.position) == Cell::Empty {
-                    let grid_aware_apple = GridAwareApple::new(apple, &mut grid);
-                    random_apples.push(grid_aware_apple);
+                    grid.set_cell(apple.position, Cell::Apple);
+                    num_apples += 1;
                     break;
                 }
                 attempts += 1;
@@ -453,7 +404,7 @@ impl RandomGenerator {
 
         GameState {
             snakes: random_snakes,
-            apples: random_apples,
+            num_apples,
             grid,
         }
     }
