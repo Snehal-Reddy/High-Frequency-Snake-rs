@@ -25,10 +25,12 @@ impl Snake {
         }
     }
 
-    pub fn move_forward(&mut self) {
+    pub fn move_forward(&mut self, will_grow: bool) {
         let new_head = self.calculate_new_head();
         self.body.push_front(new_head);
-        self.body.pop_back();
+        if !will_grow {
+            self.body.pop_back();
+        }
     }
     
     /// Calculate where the snake's head will be after moving forward
@@ -71,10 +73,6 @@ impl Snake {
         }
     }
 
-    pub fn grow(&mut self) {
-        let tail = *self.body.back().unwrap();
-        self.body.push_back(tail);
-    }
 
     pub fn change_direction(&mut self, new_direction: Direction) {
         // Prevent snake from reversing on itself
@@ -99,7 +97,7 @@ pub struct GridAwareSnake {
 impl GridAwareSnake {
     /// Create a new GridAwareSnake. The snake will be added to the grid immediately.
     pub fn new(snake: Snake, grid: &mut Grid) -> Self {
-        let mut wrapper = Self { snake: CachePadded::new(snake) };
+        let wrapper = Self { snake: CachePadded::new(snake) };
         
         // Add initial snake body to grid
         wrapper.update_grid_with_body(grid);
@@ -110,7 +108,7 @@ impl GridAwareSnake {
     /// Move the snake forward, automatically updating the grid
     /// Returns true if movement was successful, false if collision occurred
     #[inline(always)]
-    pub fn move_forward(&mut self, grid: &mut Grid) -> bool {
+    pub fn move_forward(&mut self, grid: &mut Grid, will_grow: bool) -> bool {
         // Calculate new head position
         let new_head = self.snake.calculate_new_head();
         
@@ -122,13 +120,15 @@ impl GridAwareSnake {
         }
         
         // No collision - proceed with movement
-        // Clear the tail position from grid before moving
-        if let Some(tail) = self.snake.body.back() {
-            grid.set_cell(*tail, Cell::Empty);
+        // Only clear the tail position from grid if not growing
+        if !will_grow {
+            if let Some(tail) = self.snake.body.back() {
+                grid.set_cell(*tail, Cell::Empty);
+            }
         }
         
-        // Move the snake
-        self.snake.move_forward();
+        // Move the snake with growth flag
+        self.snake.move_forward(will_grow);
         
         // Update grid with new head position
         if let Some(head) = self.snake.body.front() {
@@ -138,16 +138,6 @@ impl GridAwareSnake {
         return true;
     }
     
-    /// Grow the snake, automatically updating the grid
-    #[inline(always)]
-    pub fn grow(&mut self, grid: &mut Grid) {
-        self.snake.grow();
-        
-        // Add the new tail segment to grid
-        if let Some(new_tail) = self.snake.body.back() {
-            grid.set_cell(*new_tail, Cell::Snake);
-        }
-    }
     
     /// Mark the snake as dead and clear it from the grid
     #[inline(always)]

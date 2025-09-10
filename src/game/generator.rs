@@ -52,7 +52,7 @@ impl DeterministicGenerator {
             let mut snake = Snake::new(i as u32, *pos, Direction::Right);
             // Grow to initial length
             for _ in 0..config.initial_snake_length - 1 {
-                snake.grow();
+                snake.move_forward(true);
             }
             let grid_aware_snake = GridAwareSnake::new(snake, &mut grid);
             snakes.push(grid_aware_snake);
@@ -105,7 +105,7 @@ impl DeterministicGenerator {
             let pos = Point { x: x as u16, y: y as u16 };
             let mut snake = Snake::new(i as u32, pos, initial_direction);
             for _ in 0..config.initial_snake_length - 1 {
-                snake.grow();
+                snake.move_forward(true);
             }
             let grid_aware_snake = GridAwareSnake::new(snake, &mut grid);
             snakes.push(grid_aware_snake);
@@ -141,7 +141,7 @@ impl DeterministicGenerator {
             let idx = i + death_group_size;
             let mut snake = Snake::new(idx as u32, snake_pos, Direction::Right);
             for _ in 0..config.initial_snake_length - 1 {
-                snake.grow();
+                snake.move_forward(true);
             }
             let grid_aware_snake = GridAwareSnake::new(snake, &mut grid);
             snakes.push(grid_aware_snake);
@@ -157,7 +157,7 @@ impl DeterministicGenerator {
             let idx = i + death_group_size + apple_group_size;
             let mut snake = Snake::new(idx as u32, pos, Direction::Right);
             for _ in 0..config.initial_snake_length - 1 {
-                snake.grow();
+                snake.move_forward(true);
             }
             let grid_aware_snake = GridAwareSnake::new(snake, &mut grid);
             snakes.push(grid_aware_snake);
@@ -355,7 +355,7 @@ impl RandomGenerator {
                     // Grow the snake and check each new segment
                     let mut valid_growth = true;
                     for _ in 0..3 {
-                        snake.grow();
+                        snake.move_forward(true);
                         // Check if the new tail position is valid
                         if let Some(tail) = snake.body.back() {
                             if grid.get_cell(tail) != Cell::Empty {

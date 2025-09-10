@@ -14,7 +14,7 @@ mod tests {
         let mut snake = Snake::new(1, Point { x: 500, y: 500 }, Direction::Right);
         let initial_head = *snake.body.front().unwrap();
 
-        snake.move_forward();
+        snake.move_forward(false);
         let new_head = *snake.body.front().unwrap();
 
         assert_eq!(new_head.x, initial_head.x + 1);
@@ -24,7 +24,7 @@ mod tests {
     #[test]
     fn test_snake_boundary_wrapping() {
         let mut snake = Snake::new(1, Point { x: (GRID_WIDTH - 1) as u16, y: 500 }, Direction::Right);
-        snake.move_forward();
+        snake.move_forward(false);
         let new_head = *snake.body.front().unwrap();
 
         assert_eq!(new_head.x, 0); // Should wrap to 0
@@ -36,7 +36,7 @@ mod tests {
         let mut snake = Snake::new(1, Point { x: 500, y: 500 }, Direction::Right);
         let initial_length = snake.body.len();
 
-        snake.grow();
+        snake.move_forward(true); // Move forward with growth
         assert_eq!(snake.body.len(), initial_length + 1);
     }
 
@@ -239,14 +239,14 @@ mod tests {
         assert_eq!(grid.get_cell(&Point { x: 500, y: 500 }), Cell::Snake);
         
         // Move snake
-        let _moved = grid_aware_snake.move_forward(&mut grid);
+        let _moved = grid_aware_snake.move_forward(&mut grid, false);
         
         // Check that old position is cleared and new position is set
         assert_eq!(grid.get_cell(&Point { x: 500, y: 500 }), Cell::Empty);
         assert_eq!(grid.get_cell(&Point { x: 501, y: 500 }), Cell::Snake);
         
-        // Grow snake (this duplicates the tail position)
-        grid_aware_snake.grow(&mut grid);
+        // Grow snake by moving forward with growth
+        let _moved = grid_aware_snake.move_forward(&mut grid, true);
         
         // Check that the tail position (501, 500) is still in the grid
         assert_eq!(grid.get_cell(&Point { x: 501, y: 500 }), Cell::Snake);
@@ -353,7 +353,7 @@ mod tests {
     // Edge Cases Tests
     #[test]
     fn test_boundary_wrapping_all_directions() {
-        let mut game = GameState::new();
+        let _game = GameState::new();
 
         // Test all four directions at boundaries
         let test_cases = vec![
@@ -366,7 +366,7 @@ mod tests {
         for (start_pos, direction, expected_pos) in test_cases {
             let snake = Snake::new(1, start_pos, direction);
             let mut test_snake = snake;
-            test_snake.move_forward();
+            test_snake.move_forward(false);
             let new_head = *test_snake.body.front().unwrap();
             assert_eq!(new_head, expected_pos);
         }
@@ -600,8 +600,7 @@ mod tests {
         
         // Move and grow multiple times
         for _ in 0..5 {
-            let _moved = grid_aware_snake.move_forward(&mut grid);
-            grid_aware_snake.grow(&mut grid);
+            let _moved = grid_aware_snake.move_forward(&mut grid, true);
         }
         
         // Verify all segments are in grid

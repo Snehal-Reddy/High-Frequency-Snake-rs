@@ -35,7 +35,7 @@ impl GameState {
                     // Grow the snake and check each new segment
                     let mut valid_growth = true;
                     for _ in 0..3 {
-                        snake.grow();
+                        snake.move_forward(true); // Move forward with growth
                         // Check if the new tail position is valid
                         if let Some(tail) = snake.body.back() {
                             if grid.get_cell(tail) != Cell::Empty {
@@ -124,11 +124,10 @@ impl GameState {
             };
             
             // Move snake (collision detection happens automatically)
-            if snake.move_forward(&mut self.grid) {
+            if snake.move_forward(&mut self.grid, will_eat_apple) {
                 // If snake was going to eat an apple, handle it now
                 if will_eat_apple {
                     if let Some(head) = snake.head().copied() {
-                        snake.grow(&mut self.grid); // Grid update happens automatically
                         self.grid.set_cell(head, Cell::Empty);
                         self.num_apples -= 1;
                         consumed_apples += 1;
