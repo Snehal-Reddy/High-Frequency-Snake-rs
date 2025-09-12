@@ -7,11 +7,20 @@ use crate::game::{
 use grid::Cell;
 use rand::Rng;
 
+#[derive(Debug, Clone, Copy)]
+pub struct MovementRecord {
+    pub snake_id: u32,
+    pub new_head: Point,
+    pub cell_at_new_head: Cell,
+}
+
 pub struct GameState {
     // Using wrapper types that automatically manage grid updates
     pub snakes: Vec<GridAwareSnake>,
     pub num_apples: u64,
     pub grid: Grid,
+    // Pre-allocated movement records to avoid allocation on every tick
+    pub movement_records: Vec<MovementRecord>,
 }
 
 impl GameState {
@@ -86,6 +95,11 @@ impl GameState {
             snakes: random_snakes,
             num_apples: num_apples,
             grid,
+            movement_records: vec![MovementRecord {
+                snake_id: 0,
+                new_head: Point { x: 0, y: 0 },
+                cell_at_new_head: Cell::Empty,
+            }; SNAKE_CAPACITY],
         }
     }
     
@@ -94,11 +108,16 @@ impl GameState {
             snakes: Vec::<GridAwareSnake>::with_capacity(SNAKE_CAPACITY),
             num_apples: 0,
             grid: Grid::new(),
+            movement_records: vec![MovementRecord {
+                snake_id: 0,
+                new_head: Point { x: 0, y: 0 },
+                cell_at_new_head: Cell::Empty,
+            }; SNAKE_CAPACITY],
         }
     }
 
-    /// The main game loop (hot path baby!)
-    pub fn tick(&mut self, inputs: &[Input]) {
+    /// The legacy game loop (pre cache-aware)
+    pub fn tick_legacy(&mut self, inputs: &[Input]) {
         // Process inputs and update snake directions
         // TODO: Wonder if sorting inputs will be faster for cache?
         for input in inputs {
@@ -139,6 +158,82 @@ impl GameState {
         }
 
         // Spawn new apples to replace consumed ones
+        if consumed_apples > 0 {
+            for _ in 0..consumed_apples {
+                self.spawn_apple();
+            }
+        }
+    }
+
+    /// The main game loop (cache-aware)
+    pub fn tick(&mut self, inputs: &[Input]) {
+        // Phase 1: Process inputs (unchanged)
+        for input in inputs {
+            self.snakes[input.snake_id as usize].change_direction(input.direction);
+        }
+
+        // Phase 1: Collect Records (NO Grid Reads)
+        let mut record_count = 0;
+        for snake in &self.snakes {
+            if !snake.is_alive() { continue; }
+
+            let new_head = snake.calculate_new_head();
+
+            // Direct index assignment - we know the capacity is SNAKE_CAPACITY
+            self.movement_records[record_count] = MovementRecord {
+                snake_id: snake.id(),
+                new_head,
+                cell_at_new_head: Cell::Empty, // Will be filled in Phase 3
+            };
+            record_count += 1;
+        }
+
+        // Phase 2: Sort by Spatial Locality (only alive snakes)
+        self.movement_records[..record_count].sort_by_key(|record: &MovementRecord| (record.new_head.y, record.new_head.x));
+
+        // Phase 3-5: Combined Loop (Read, Process, Write Immediately)
+        let mut consumed_apples: u64 = 0;
+        let mut previous_new_head: Option<Point> = None;
+
+        for record in &mut self.movement_records[..record_count] {
+            // Phase 3: Read cell value (cache-friendly since records are sorted)
+            record.cell_at_new_head = self.grid.get_cell(&record.new_head);
+
+            if record.cell_at_new_head == Cell::Snake {
+                self.snakes[record.snake_id as usize].mark_dead();
+                continue; // Skip this snake
+            }
+
+            if let Some(prev_pos) = previous_new_head {
+                if record.new_head == prev_pos {
+                    self.snakes[record.snake_id as usize].mark_dead();
+                    continue; // Skip this snake
+                }
+            }
+
+            previous_new_head = Some(record.new_head);
+
+            let will_grow = record.cell_at_new_head == Cell::Apple;
+            if will_grow {
+                consumed_apples += 1;
+            }
+
+            // Write new head
+            self.grid.set_cell(record.new_head, Cell::Snake);
+
+            // Write tail clearing (if not growing) - get tail position directly from snake
+            if !will_grow {
+                let snake = &self.snakes[record.snake_id as usize];
+                if let Some(tail_pos) = snake.tail_position() {
+                    self.grid.set_cell(tail_pos, Cell::Empty);
+                }
+            }
+
+            // Update snake body (no grid access)
+            self.snakes[record.snake_id as usize].update_body(will_grow);
+        }
+
+        // Phase 6: Spawn new apples to replace consumed ones
         if consumed_apples > 0 {
             for _ in 0..consumed_apples {
                 self.spawn_apple();

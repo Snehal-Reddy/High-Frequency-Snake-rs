@@ -105,8 +105,33 @@ impl GridAwareSnake {
         wrapper
     }
     
+    /// Calculate new head position (no grid access)
+    #[inline(always)]
+    pub fn calculate_new_head(&self) -> Point {
+        self.snake.calculate_new_head()
+    }
+    
+    /// Get current tail position (no grid access)
+    #[inline(always)]
+    pub fn tail_position(&self) -> Option<Point> {
+        self.snake.body.back().copied()
+    }
+    
+    /// Update snake body after successful movement (no grid access)
+    #[inline(always)]
+    pub fn update_body(&mut self, will_grow: bool) {
+        self.snake.move_forward(will_grow);
+    }
+    
+    /// Mark snake as dead (no grid access)
+    #[inline(always)]
+    pub fn mark_dead(&mut self) {
+        self.snake.is_alive = false;
+    }
+    
     /// Move the snake forward, automatically updating the grid
     /// Returns true if movement was successful, false if collision occurred
+    #[deprecated(note = "Use cache-aware methods: calculate_new_head(), update_body(), mark_dead()")]
     #[inline(always)]
     pub fn move_forward(&mut self, grid: &mut Grid, will_grow: bool) -> bool {
         // Calculate new head position

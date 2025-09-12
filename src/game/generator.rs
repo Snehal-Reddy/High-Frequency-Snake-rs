@@ -71,6 +71,11 @@ impl DeterministicGenerator {
             snakes,
             num_apples,
             grid,
+            movement_records: vec![crate::game::engine::MovementRecord {
+                snake_id: 0,
+                new_head: crate::game::types::Point { x: 0, y: 0 },
+                cell_at_new_head: crate::game::grid::Cell::Empty,
+            }; crate::game::snake::SNAKE_CAPACITY],
         }
     }
     
@@ -176,6 +181,11 @@ impl DeterministicGenerator {
             snakes,
             num_apples,
             grid,
+            movement_records: vec![crate::game::engine::MovementRecord {
+                snake_id: 0,
+                new_head: crate::game::types::Point { x: 0, y: 0 },
+                cell_at_new_head: crate::game::grid::Cell::Empty,
+            }; crate::game::snake::SNAKE_CAPACITY],
         }
     }
     
@@ -406,6 +416,11 @@ impl RandomGenerator {
             snakes: random_snakes,
             num_apples,
             grid,
+            movement_records: vec![crate::game::engine::MovementRecord {
+                snake_id: 0,
+                new_head: crate::game::types::Point { x: 0, y: 0 },
+                cell_at_new_head: crate::game::grid::Cell::Empty,
+            }; crate::game::snake::SNAKE_CAPACITY],
         }
     }
 }

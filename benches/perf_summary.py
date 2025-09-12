@@ -6,16 +6,21 @@ Measure cache and branch behavior across snake counts using perf_counters_bench.
 - Parses stdout to extract global average results
 - Does multiple runs per snake count and averages results
 - Prints a compact table and writes JSON summary to perf_summary.json
+
+Usage:
+  python3 perf_summary.py           # Run for all snake counts [100, 300, 500, 700, 900, 1000]
+  python3 perf_summary.py 1000     # Run only for 1000 snakes
 """
 
 import subprocess
 import json
 import re
 import statistics
+import sys
 from typing import Dict, Any, List
 
-SNAKE_COUNTS = [100, 300, 500, 700, 900, 1000]
-RUNS_PER_SNAKE_COUNT = 5  # Number of runs per snake count
+DEFAULT_SNAKE_COUNTS = [100, 300, 500, 700, 900, 1000]
+RUNS_PER_SNAKE_COUNT = 3  # Number of runs per snake count
 
 # Column definitions: (header, width)
 COLUMNS = [
@@ -158,7 +163,21 @@ def _fmt_row(res: Dict[str, Any]) -> str:
 
 
 def main() -> None:
-    print("=== Measuring cache and branch metrics across snake counts ===")
+    # Parse command line arguments
+    if len(sys.argv) > 1:
+        try:
+            snake_count = int(sys.argv[1])
+            snake_counts = [snake_count]
+            print(f"=== Measuring cache and branch metrics for {snake_count} snakes ===")
+        except ValueError:
+            print(f"Error: '{sys.argv[1]}' is not a valid number")
+            print("Usage: python3 perf_summary.py [snake_count]")
+            print("  If no snake_count provided, runs for all counts: [100, 300, 500, 700, 900, 1000]")
+            sys.exit(1)
+    else:
+        snake_counts = DEFAULT_SNAKE_COUNTS
+        print("=== Measuring cache and branch metrics across snake counts ===")
+    
     print("Using perf_counters_bench with deterministic hot path and cache warmup")
     print(f"Running {RUNS_PER_SNAKE_COUNT} measurements per snake count for reliability")
     print()
@@ -170,7 +189,7 @@ def main() -> None:
     print(header)
     print("-" * len(header))
 
-    for n in SNAKE_COUNTS:
+    for n in snake_counts:
         print(f"\nMeasuring {n} snakes:")
         res = run_multiple_perf_measurements(n, RUNS_PER_SNAKE_COUNT)
         results.append(res)
@@ -186,7 +205,7 @@ def main() -> None:
         json.dump({
             "metadata": {
                 "runs_per_snake_count": RUNS_PER_SNAKE_COUNT,
-                "snake_counts": SNAKE_COUNTS,
+                "snake_counts": snake_counts,
                 "benchmark": "perf_counters_bench",
                 "description": "Deterministic hot path benchmark with cache warmup and hardware performance counters"
             },
