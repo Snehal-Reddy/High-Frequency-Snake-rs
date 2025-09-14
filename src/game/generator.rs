@@ -1,6 +1,6 @@
 use crate::game::{
     apple::{APPLE_CAPACITY, Apple},
-    engine::GameState,
+    engine::{GameState, NUM_BUCKETS, EXPECTED_SNAKES_PER_BUCKET},
     grid::{Cell, GRID_HEIGHT, GRID_WIDTH, Grid},
     snake::{SNAKE_CAPACITY, Snake, GridAwareSnake},
     types::{Direction, Point},
@@ -71,11 +71,12 @@ impl DeterministicGenerator {
             snakes,
             num_apples,
             grid,
-            movement_records: vec![crate::game::engine::MovementRecord {
-                snake_id: 0,
-                new_head: crate::game::types::Point { x: 0, y: 0 },
-                cell_at_new_head: crate::game::grid::Cell::Empty,
-            }; crate::game::snake::SNAKE_CAPACITY],
+            buckets: (0..NUM_BUCKETS)
+                .map(|_| Vec::with_capacity(EXPECTED_SNAKES_PER_BUCKET))
+                .collect(),
+            tail_buckets: (0..NUM_BUCKETS)
+                .map(|_| Vec::with_capacity(EXPECTED_SNAKES_PER_BUCKET))
+                .collect(),
         }
     }
     
@@ -181,11 +182,12 @@ impl DeterministicGenerator {
             snakes,
             num_apples,
             grid,
-            movement_records: vec![crate::game::engine::MovementRecord {
-                snake_id: 0,
-                new_head: crate::game::types::Point { x: 0, y: 0 },
-                cell_at_new_head: crate::game::grid::Cell::Empty,
-            }; crate::game::snake::SNAKE_CAPACITY],
+            buckets: (0..NUM_BUCKETS)
+                .map(|_| Vec::with_capacity(EXPECTED_SNAKES_PER_BUCKET))
+                .collect(),
+            tail_buckets: (0..NUM_BUCKETS)
+                .map(|_| Vec::with_capacity(EXPECTED_SNAKES_PER_BUCKET))
+                .collect(),
         }
     }
     
@@ -416,11 +418,12 @@ impl RandomGenerator {
             snakes: random_snakes,
             num_apples,
             grid,
-            movement_records: vec![crate::game::engine::MovementRecord {
-                snake_id: 0,
-                new_head: crate::game::types::Point { x: 0, y: 0 },
-                cell_at_new_head: crate::game::grid::Cell::Empty,
-            }; crate::game::snake::SNAKE_CAPACITY],
+            buckets: (0..NUM_BUCKETS)
+                .map(|_| Vec::with_capacity(EXPECTED_SNAKES_PER_BUCKET))
+                .collect(),
+            tail_buckets: (0..NUM_BUCKETS)
+                .map(|_| Vec::with_capacity(EXPECTED_SNAKES_PER_BUCKET))
+                .collect(),
         }
     }
 }

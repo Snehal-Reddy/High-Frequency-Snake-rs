@@ -7,6 +7,12 @@ use crate::game::{
 use grid::Cell;
 use rand::Rng;
 
+// Bucket partitioning constants for cache-aware processing
+pub const BUCKET_BITS: usize = 8;
+pub const NUM_BUCKETS: usize = 1 << BUCKET_BITS; // 128
+// 50% overestimate to prevent frequent reallocations
+pub const EXPECTED_SNAKES_PER_BUCKET: usize = ((SNAKE_CAPACITY + NUM_BUCKETS - 1) / NUM_BUCKETS * 3) / 2; 
+
 #[derive(Debug, Clone, Copy)]
 pub struct MovementRecord {
     pub snake_id: u32,
@@ -14,13 +20,16 @@ pub struct MovementRecord {
     pub cell_at_new_head: Cell,
 }
 
+
 pub struct GameState {
     // Using wrapper types that automatically manage grid updates
     pub snakes: Vec<GridAwareSnake>,
     pub num_apples: u64,
     pub grid: Grid,
-    // Pre-allocated movement records to avoid allocation on every tick
-    pub movement_records: Vec<MovementRecord>,
+    // Pre-allocated buckets for cache-aware processing - reused every tick
+    pub buckets: Vec<Vec<MovementRecord>>,
+    // Pre-allocated buckets for tail clearing - reused every tick
+    pub tail_buckets: Vec<Vec<Point>>,
 }
 
 impl GameState {
@@ -91,33 +100,43 @@ impl GameState {
             }
         }
 
+        // Pre-allocate buckets for cache-aware processing
+        let buckets = (0..NUM_BUCKETS)
+            .map(|_| Vec::with_capacity(EXPECTED_SNAKES_PER_BUCKET))
+            .collect();
+        let tail_buckets = (0..NUM_BUCKETS)
+            .map(|_| Vec::with_capacity(EXPECTED_SNAKES_PER_BUCKET))
+            .collect();
+
         Self {
             snakes: random_snakes,
             num_apples: num_apples,
             grid,
-            movement_records: vec![MovementRecord {
-                snake_id: 0,
-                new_head: Point { x: 0, y: 0 },
-                cell_at_new_head: Cell::Empty,
-            }; SNAKE_CAPACITY],
+            buckets,
+            tail_buckets,
         }
     }
     
     pub fn new() -> Self {
+        // Pre-allocate buckets for cache-aware processing
+        let buckets = (0..NUM_BUCKETS)
+            .map(|_| Vec::with_capacity(EXPECTED_SNAKES_PER_BUCKET))
+            .collect();
+        let tail_buckets = (0..NUM_BUCKETS)
+            .map(|_| Vec::with_capacity(EXPECTED_SNAKES_PER_BUCKET))
+            .collect();
+
         Self {
             snakes: Vec::<GridAwareSnake>::with_capacity(SNAKE_CAPACITY),
             num_apples: 0,
             grid: Grid::new(),
-            movement_records: vec![MovementRecord {
-                snake_id: 0,
-                new_head: Point { x: 0, y: 0 },
-                cell_at_new_head: Cell::Empty,
-            }; SNAKE_CAPACITY],
+            buckets,
+            tail_buckets,
         }
     }
 
     /// The legacy game loop (pre cache-aware)
-    pub fn tick_legacy(&mut self, inputs: &[Input]) {
+    pub fn tick(&mut self, inputs: &[Input]) {
         // Process inputs and update snake directions
         // TODO: Wonder if sorting inputs will be faster for cache?
         for input in inputs {
@@ -166,74 +185,88 @@ impl GameState {
     }
 
     /// The main game loop (cache-aware)
-    pub fn tick(&mut self, inputs: &[Input]) {
+    pub fn tick_new(&mut self, inputs: &[Input]) {
         // Phase 1: Process inputs (unchanged)
         for input in inputs {
             self.snakes[input.snake_id as usize].change_direction(input.direction);
         }
 
-        // Phase 1: Collect Records (NO Grid Reads)
-        let mut record_count = 0;
+        // Phase 1: Clear pre-allocated buckets (reuse capacity, no allocation)
+        for bucket in &mut self.buckets {
+            bucket.clear();
+        }
+        for tail_bucket in &mut self.tail_buckets {
+            tail_bucket.clear();
+        }
+
+        // Phase 2: Collect records directly into spatial buckets
         for snake in &self.snakes {
             if !snake.is_alive() { continue; }
 
             let new_head = snake.calculate_new_head();
+            let bucket_idx = (new_head.y >> (16 - BUCKET_BITS)) as usize;
 
-            // Direct index assignment - we know the capacity is SNAKE_CAPACITY
-            self.movement_records[record_count] = MovementRecord {
+            self.buckets[bucket_idx].push(MovementRecord {
                 snake_id: snake.id(),
                 new_head,
                 cell_at_new_head: Cell::Empty, // Will be filled in Phase 3
-            };
-            record_count += 1;
+            });
         }
-
-        // Phase 2: Sort by Spatial Locality (only alive snakes)
-        self.movement_records[..record_count].sort_by_key(|record: &MovementRecord| (record.new_head.y, record.new_head.x));
 
         // Phase 3-5: Combined Loop (Read, Process, Write Immediately)
         let mut consumed_apples: u64 = 0;
         let mut previous_new_head: Option<Point> = None;
 
-        for record in &mut self.movement_records[..record_count] {
-            // Phase 3: Read cell value (cache-friendly since records are sorted)
-            record.cell_at_new_head = self.grid.get_cell(&record.new_head);
+        for bucket in &mut self.buckets {
+            if bucket.is_empty() { continue; }
 
-            if record.cell_at_new_head == Cell::Snake {
-                self.snakes[record.snake_id as usize].mark_dead();
-                continue; // Skip this snake
-            }
+            for record in bucket {
+                // Phase 3: Read cell value (cache-friendly since records are sorted)
+                record.cell_at_new_head = self.grid.get_cell(&record.new_head);
 
-            if let Some(prev_pos) = previous_new_head {
-                if record.new_head == prev_pos {
+                if record.cell_at_new_head == Cell::Snake {
                     self.snakes[record.snake_id as usize].mark_dead();
                     continue; // Skip this snake
                 }
-            }
 
-            previous_new_head = Some(record.new_head);
-
-            let will_grow = record.cell_at_new_head == Cell::Apple;
-            if will_grow {
-                consumed_apples += 1;
-            }
-
-            // Write new head
-            self.grid.set_cell(record.new_head, Cell::Snake);
-
-            // Write tail clearing (if not growing) - get tail position directly from snake
-            if !will_grow {
-                let snake = &self.snakes[record.snake_id as usize];
-                if let Some(tail_pos) = snake.tail_position() {
-                    self.grid.set_cell(tail_pos, Cell::Empty);
+                if let Some(prev_pos) = previous_new_head {
+                    if record.new_head == prev_pos {
+                        self.snakes[record.snake_id as usize].mark_dead();
+                        continue; // Skip this snake
+                    }
                 }
-            }
 
-            // Update snake body (no grid access)
-            self.snakes[record.snake_id as usize].update_body(will_grow);
+                previous_new_head = Some(record.new_head);
+
+                let will_grow = record.cell_at_new_head == Cell::Apple;
+                if will_grow {
+                    consumed_apples += 1;
+                }
+
+                // Write new head
+                self.grid.set_cell(record.new_head, Cell::Snake);
+
+                // Collect tail position for spatial clearing (only if not growing)
+                if !will_grow {
+                    if let Some(tail_pos) = self.snakes[record.snake_id as usize].tail_position() {
+                        let tail_bucket_idx = (tail_pos.y >> (16 - BUCKET_BITS)) as usize;
+                        self.tail_buckets[tail_bucket_idx].push(tail_pos);
+                    }
+                }
+
+                // Update snake body (no grid access)
+                self.snakes[record.snake_id as usize].update_body(will_grow);
+            }
         }
 
-        // Phase 6: Spawn new apples to replace consumed ones
+        // Phase 6: Clear tails with spatial locality
+        for tail_bucket in &mut self.tail_buckets {
+            for tail_pos in tail_bucket {
+                self.grid.set_cell(*tail_pos, Cell::Empty);
+            }
+        }
+
+        // Phase 7: Spawn new apples to replace consumed ones
         if consumed_apples > 0 {
             for _ in 0..consumed_apples {
                 self.spawn_apple();
