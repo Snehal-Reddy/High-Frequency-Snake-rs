@@ -15,7 +15,7 @@ pub struct Snake {
 impl Snake {
     pub fn new(id: u32, start_pos: Point, initial_direction: Direction) -> Self {
         let mut body = TinyDeque::new();
-        body.push_front(start_pos);
+        body.push_back(start_pos);
         Self {
             id,
             body,
@@ -26,16 +26,16 @@ impl Snake {
 
     pub fn move_forward(&mut self, will_grow: bool) {
         let new_head = self.calculate_new_head();
-        self.body.push_front(new_head);
+        self.body.push_back(new_head);
         if !will_grow {
-            self.body.pop_back();
+            self.body.pop_front();
         }
     }
     
     /// Calculate where the snake's head will be after moving forward
     #[inline(always)]
     pub fn calculate_new_head(&self) -> Point {
-        let current_head = self.body.get(0).unwrap();
+        let current_head = self.body.get(self.body.len() - 1).unwrap();
         match self.direction {
             Direction::Up => Point {
                 x: current_head.x,
@@ -114,7 +114,7 @@ impl GridAwareSnake {
     #[inline(always)]
     pub fn tail_position(&self) -> Option<Point> {
         if self.snake.body.len() > 0 {
-            self.snake.body.get(self.snake.body.len() - 1).copied()
+            self.snake.body.get(0).copied()
         } else {
             None
         }
@@ -150,7 +150,7 @@ impl GridAwareSnake {
         // No collision - proceed with movement
         // Only clear the tail position from grid if not growing
         if !will_grow {
-            if let Some(tail) = self.snake.body.get(self.snake.body.len() - 1) {
+            if let Some(tail) = self.snake.body.get(0) {
                 grid.set_cell(*tail, Cell::Empty);
             }
         }
@@ -159,7 +159,7 @@ impl GridAwareSnake {
         self.snake.move_forward(will_grow);
         
         // Update grid with new head position
-        if let Some(head) = self.snake.body.get(0) {
+        if let Some(head) = self.snake.body.get(self.snake.body.len() - 1) {
             grid.set_cell(*head, Cell::Snake);
         }
         
@@ -203,7 +203,11 @@ impl GridAwareSnake {
     /// Get snake head position
     #[inline(always)]
     pub fn head(&self) -> Option<&Point> {
-        self.snake.body.get(0)
+        if self.snake.body.len() > 0 {
+            self.snake.body.get(self.snake.body.len() - 1)
+        } else {
+            None
+        }
     }
     
 

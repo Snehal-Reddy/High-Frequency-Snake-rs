@@ -12,10 +12,10 @@ mod tests {
     #[test]
     fn test_snake_movement() {
         let mut snake = Snake::new(1, Point { x: 500, y: 500 }, Direction::Right);
-        let initial_head = *snake.body.front().unwrap();
+        let initial_head = *snake.body.get(snake.body.len() - 1).unwrap();
 
         snake.move_forward(false);
-        let new_head = *snake.body.front().unwrap();
+        let new_head = *snake.body.get(snake.body.len() - 1).unwrap();
 
         assert_eq!(new_head.x, initial_head.x + 1);
         assert_eq!(new_head.y, initial_head.y);
@@ -25,7 +25,7 @@ mod tests {
     fn test_snake_boundary_wrapping() {
         let mut snake = Snake::new(1, Point { x: (GRID_WIDTH - 1) as u16, y: 500 }, Direction::Right);
         snake.move_forward(false);
-        let new_head = *snake.body.front().unwrap();
+        let new_head = *snake.body.get(snake.body.len() - 1).unwrap();
 
         assert_eq!(new_head.x, 0); // Should wrap to 0
         assert_eq!(new_head.y, 500);
@@ -159,10 +159,10 @@ mod tests {
 
         // Verify all snakes are within grid bounds
         for snake in game.snakes.iter() {
-            for part in snake.body() {
+            for i in 0..snake.body().len() { if let Some(part) = snake.body().get(i) {
                 assert!(part.x < GRID_WIDTH as u16);
                 assert!(part.y < GRID_HEIGHT as u16);
-            }
+            }}
         }
 
         // Verify apple count is reasonable
@@ -170,9 +170,9 @@ mod tests {
 
         // Verify grid consistency
         for snake in game.snakes.iter() {
-            for part in snake.body() {
+            for i in 0..snake.body().len() { if let Some(part) = snake.body().get(i) {
                 assert_eq!(game.grid.get_cell(part), Cell::Snake);
-            }
+            }}
         }
 
         // Verify apples exist in grid (count them)
@@ -367,7 +367,7 @@ mod tests {
             let snake = Snake::new(1, start_pos, direction);
             let mut test_snake = snake;
             test_snake.move_forward(false);
-            let new_head = *test_snake.body.front().unwrap();
+            let new_head = *test_snake.body.get(test_snake.body.len() - 1).unwrap();
             assert_eq!(new_head, expected_pos);
         }
     }
@@ -433,25 +433,25 @@ mod tests {
 
         // Verify grid consistency after collision
         for snake in game.snakes.iter() {
-            for part in snake.body() {
+            for i in 0..snake.body().len() { if let Some(part) = snake.body().get(i) {
                 assert_eq!(game.grid.get_cell(part), Cell::Snake);
-            }
+            }}
         }
 
         // Verify no dead snake parts remain in grid
         let mut snake_positions = std::collections::HashSet::new();
         for snake in game.snakes.iter() {
-            for part in snake.body() {
+            for i in 0..snake.body().len() { if let Some(part) = snake.body().get(i) {
                 snake_positions.insert(*part);
-            }
+            }}
         }
 
         // Check that all Snake cells in grid belong to living snakes
         // Only check positions where we know snakes should be
         for snake in game.snakes.iter() {
-            for part in snake.body() {
+            for i in 0..snake.body().len() { if let Some(part) = snake.body().get(i) {
                 assert_eq!(game.grid.get_cell(part), Cell::Snake);
-            }
+            }}
         }
     }
 
@@ -540,9 +540,9 @@ mod tests {
             // Verify grid consistency every few ticks
             if tick % 5 == 0 {
                 for snake in game.snakes.iter() {
-                    for part in snake.body() {
+                    for i in 0..snake.body().len() { if let Some(part) = snake.body().get(i) {
                         assert_eq!(game.grid.get_cell(part), Cell::Snake);
-                    }
+                    }}
                 }
             }
         }
@@ -570,9 +570,9 @@ mod tests {
             
             // Verify grid consistency
             for snake in game.snakes.iter() {
-                for part in snake.body() {
+                for i in 0..snake.body().len() { if let Some(part) = snake.body().get(i) {
                     assert_eq!(game.grid.get_cell(part), Cell::Snake);
-                }
+                }}
             }
             
             // Verify apples exist in grid (count them)
@@ -604,9 +604,9 @@ mod tests {
         }
         
         // Verify all segments are in grid
-        for part in grid_aware_snake.body() {
+        for i in 0..grid_aware_snake.body().len() { if let Some(part) = grid_aware_snake.body().get(i) {
             assert_eq!(grid.get_cell(part), Cell::Snake);
-        }
+        }}
     }
 
     #[test]
