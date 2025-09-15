@@ -3,15 +3,15 @@
 A high-frequency game server optimization project using a massive multiplayer snake battle royale as the test scenario.
 
 
-## Current Status: Active Development
+## Current Status: Checkpointed and parked
 
-This is an active project focused on learning low-level Rust optimizations. The core infrastructure is in place with comprehensive benchmarking, profiling capabilities, and performance optimizations including cache-aware data structures and branch prediction improvements.
+The project is now parked at this checkpoint, having achieved decent performance improvements while leaving room for future optimization work.
 
 ## Project Goal
 
 Learn and experiment with low-level optimization techniques in Rust applying them to a game server that pushes tick rates to extreme limits.
 
-**Target Performance**: 200,000+ ticks per second (5 microseconds per tick) with 1000+ concurrent snakes.
+**Achieved Performance**: ~8.6 microseconds per tick with 1000 snakes (116,000+ ticks per second).
 
 ## Game Concept
 
@@ -44,25 +44,25 @@ The application runs as a single process with two dedicated threads pinned to se
 ## What's Implemented
 
 ### Core Game Logic
-- ✅ **Game Engine**: Complete snake movement, collision detection, and state management
-- ✅ **Grid System**: 10000×10000 cell grid with efficient spatial queries
-- ✅ **Snake Logic**: Movement, growth, collision detection, and lifecycle management
-- ✅ **Apple System**: Food spawning and consumption mechanics
+- **Game Engine**: Complete snake movement, collision detection, and state management with spatial batching optimization
+- **Grid System**: 10000×10000 cell grid with efficient spatial queries
+- **Snake Logic**: Movement, growth, collision detection, and lifecycle management using TinyDeque
+- **Apple System**: Food spawning and consumption mechanics
 
 ### No BS Infrastructure
-- ✅ **SPSC Queue**: Lock-free single-producer, single-consumer queue for inter-thread communication
-- ✅ **CPU Pinning**: Thread affinity to specific CPU cores for cache locality
+- **SPSC Queue**: Lock-free single-producer, single-consumer queue for inter-thread communication
+- **CPU Pinning**: Thread affinity to specific CPU cores for cache locality
 
 ### Performance Measurement
-- ✅ **Benchmark Suite**: Comprehensive performance testing with Criterion.rs
+- **Benchmark Suite**: Comprehensive performance testing with Criterion.rs
   - SPSC queue throughput and latency benchmarks
   - Game logic performance benchmarks
   - Integrated hot path measurements
   - Hardware performance counter benchmarks
-- ✅ **Real-time Profiling**: CPU cycle-accurate measurements using `_rdtsc()`
-- ✅ **Performance Metrics**: Ticks per second, hot path latency, consume vs tick breakdown
-- ✅ **Cache Performance Analysis**: cache hit rates and memory access patterns
-- ✅ **Branch Prediction Analysis**: Branch misprediction rates and optimization opportunities
+- **Real-time Profiling**: CPU cycle-accurate measurements using `_rdtsc()`
+- **Performance Metrics**: Ticks per second, hot path latency, consume vs tick breakdown
+- **Cache Performance Analysis**: cache hit rates and memory access patterns
+- **Branch Prediction Analysis**: Branch misprediction rates and optimization opportunities
 
 ### Benchmark Categories
 - **SPSC Benchmarks**: Queue throughput, latency, and contention testing
