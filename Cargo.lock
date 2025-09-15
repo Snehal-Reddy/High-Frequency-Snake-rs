@@ -662,6 +662,8 @@ dependencies = [
 [[package]]
 name = "tinydeque"
 version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "38b6f03159c04d33a19838de62d9c1515441616636b5e8edbb5a2fa06921469e"
 dependencies = [
  "tinyvec",
 ]
