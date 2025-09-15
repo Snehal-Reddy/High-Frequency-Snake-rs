@@ -1,21 +1,20 @@
 use crate::game::grid::{GRID_HEIGHT, GRID_WIDTH, Cell, Grid};
 use crate::game::types::{Direction, Point};
 use crossbeam_utils::CachePadded;
-use std::collections::VecDeque;
+use tinydeque::TinyDeque;
 
 pub const SNAKE_CAPACITY: usize = 1024;
 
 pub struct Snake {
     pub id: u32,
-    // TODO: Static array might give better perf
-    pub body: VecDeque<Point>,
+    pub body: TinyDeque<[Point; 16]>,  // Stack-allocated for small snakes, heap for large
     pub direction: Direction,
     pub is_alive: bool,
 }
 
 impl Snake {
     pub fn new(id: u32, start_pos: Point, initial_direction: Direction) -> Self {
-        let mut body = VecDeque::new();
+        let mut body = TinyDeque::new();
         body.push_front(start_pos);
         Self {
             id,
@@ -36,7 +35,7 @@ impl Snake {
     /// Calculate where the snake's head will be after moving forward
     #[inline(always)]
     pub fn calculate_new_head(&self) -> Point {
-        let current_head = self.body.front().unwrap();
+        let current_head = self.body.get(0).unwrap();
         match self.direction {
             Direction::Up => Point {
                 x: current_head.x,
@@ -114,7 +113,11 @@ impl GridAwareSnake {
     /// Get current tail position (no grid access)
     #[inline(always)]
     pub fn tail_position(&self) -> Option<Point> {
-        self.snake.body.back().copied()
+        if self.snake.body.len() > 0 {
+            self.snake.body.get(self.snake.body.len() - 1).copied()
+        } else {
+            None
+        }
     }
     
     /// Update snake body after successful movement (no grid access)
@@ -147,7 +150,7 @@ impl GridAwareSnake {
         // No collision - proceed with movement
         // Only clear the tail position from grid if not growing
         if !will_grow {
-            if let Some(tail) = self.snake.body.back() {
+            if let Some(tail) = self.snake.body.get(self.snake.body.len() - 1) {
                 grid.set_cell(*tail, Cell::Empty);
             }
         }
@@ -156,7 +159,7 @@ impl GridAwareSnake {
         self.snake.move_forward(will_grow);
         
         // Update grid with new head position
-        if let Some(head) = self.snake.body.front() {
+        if let Some(head) = self.snake.body.get(0) {
             grid.set_cell(*head, Cell::Snake);
         }
         
@@ -200,27 +203,31 @@ impl GridAwareSnake {
     /// Get snake head position
     #[inline(always)]
     pub fn head(&self) -> Option<&Point> {
-        self.snake.body.front()
+        self.snake.body.get(0)
     }
     
 
     
     /// Get snake body
-    pub fn body(&self) -> &VecDeque<Point> {
+    pub fn body(&self) -> &TinyDeque<[Point; 16]> {
         &self.snake.body
     }
     
     // Private helper methods
 
     fn update_grid_with_body(&self, grid: &mut Grid) {
-        for part in &self.snake.body {
-            grid.set_cell(*part, Cell::Snake);
+        for i in 0..self.snake.body.len() {
+            if let Some(part) = self.snake.body.get(i) {
+                grid.set_cell(*part, Cell::Snake);
+            }
         }
     }
     
     fn clear_from_grid(&self, grid: &mut Grid) {
-        for part in &self.snake.body {
-            grid.set_cell(*part, Cell::Empty);
+        for i in 0..self.snake.body.len() {
+            if let Some(part) = self.snake.body.get(i) {
+                grid.set_cell(*part, Cell::Empty);
+            }
         }
     }
 }

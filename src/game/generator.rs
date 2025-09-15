@@ -369,7 +369,7 @@ impl RandomGenerator {
                     for _ in 0..3 {
                         snake.move_forward(true);
                         // Check if the new tail position is valid
-                        if let Some(tail) = snake.body.back() {
+                        if let Some(tail) = snake.body.get(snake.body.len() - 1) {
                             if grid.get_cell(tail) != Cell::Empty {
                                 valid_growth = false;
                                 break;

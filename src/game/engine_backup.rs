@@ -55,7 +55,7 @@ impl GameState {
                     for _ in 0..3 {
                         snake.move_forward(true); // Move forward with growth
                         // Check if the new tail position is valid
-                        if let Some(tail) = snake.body.get(snake.body.len() - 1) {
+                        if let Some(tail) = snake.body.back() {
                             if grid.get_cell(tail) != Cell::Empty {
                                 valid_growth = false;
                                 break;

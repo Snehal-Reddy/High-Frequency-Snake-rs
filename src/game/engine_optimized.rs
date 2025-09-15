@@ -55,7 +55,7 @@ impl GameState {
                     for _ in 0..3 {
                         snake.move_forward(true); // Move forward with growth
                         // Check if the new tail position is valid
-                        if let Some(tail) = snake.body.get(snake.body.len() - 1) {
+                        if let Some(tail) = snake.body.back() {
                             if grid.get_cell(tail) != Cell::Empty {
                                 valid_growth = false;
                                 break;
@@ -184,89 +184,51 @@ impl GameState {
         }
     }
 
-    /// The main game loop (cache-aware)
+    /// The main game loop (branch-elimination optimized)
     pub fn tick(&mut self, inputs: &[Input]) {
         // Phase 1: Process inputs (unchanged)
         for input in inputs {
             self.snakes[input.snake_id as usize].change_direction(input.direction);
         }
 
-        // Phase 1: Clear pre-allocated buckets (reuse capacity, no allocation)
-        for bucket in &mut self.buckets {
-            bucket.clear();
-        }
-        for tail_bucket in &mut self.tail_buckets {
-            tail_bucket.clear();
-        }
-
-        // Phase 2: Collect records directly into spatial buckets
+        // Phase 2: Pre-filter alive snakes to eliminate branch prediction penalty
+        let mut alive_snakes = Vec::with_capacity(self.snakes.len());
         for snake in &self.snakes {
-            if !snake.is_alive() { continue; }
-
-            let new_head = snake.calculate_new_head();
-            let bucket_idx = (new_head.y >> (16 - BUCKET_BITS)) as usize;
-
-            self.buckets[bucket_idx].push(MovementRecord {
-                snake_id: snake.id(),
-                new_head,
-                cell_at_new_head: Cell::Empty, // Will be filled in Phase 3
-            });
-        }
-
-        // Phase 3-5: Combined Loop (Read, Process, Write Immediately)
-        let mut consumed_apples: u64 = 0;
-        let mut previous_new_head: Option<Point> = None;
-
-        for bucket in &mut self.buckets {
-            if bucket.is_empty() { continue; }
-
-            for record in bucket {
-                // Phase 3: Read cell value (cache-friendly since records are sorted)
-                record.cell_at_new_head = self.grid.get_cell(&record.new_head);
-
-                if record.cell_at_new_head == Cell::Snake {
-                    self.snakes[record.snake_id as usize].mark_dead();
-                    continue; // Skip this snake
-                }
-
-                if let Some(prev_pos) = previous_new_head {
-                    if record.new_head == prev_pos {
-                        self.snakes[record.snake_id as usize].mark_dead();
-                        continue; // Skip this snake
-                    }
-                }
-
-                previous_new_head = Some(record.new_head);
-
-                let will_grow = record.cell_at_new_head == Cell::Apple;
-                if will_grow {
-                    consumed_apples += 1;
-                }
-
-                // Write new head
-                self.grid.set_cell(record.new_head, Cell::Snake);
-
-                // Collect tail position for spatial clearing (only if not growing)
-                if !will_grow {
-                    if let Some(tail_pos) = self.snakes[record.snake_id as usize].tail_position() {
-                        let tail_bucket_idx = (tail_pos.y >> (16 - BUCKET_BITS)) as usize;
-                        self.tail_buckets[tail_bucket_idx].push(tail_pos);
-                    }
-                }
-
-                // Update snake body (no grid access)
-                self.snakes[record.snake_id as usize].update_body(will_grow);
+            if snake.is_alive() {
+                alive_snakes.push(snake.id());
             }
         }
 
-        // Phase 6: Clear tails with spatial locality
-        for tail_bucket in &mut self.tail_buckets {
-            for tail_pos in tail_bucket {
-                self.grid.set_cell(*tail_pos, Cell::Empty);
+        let mut consumed_apples = 0;
+        
+        // Phase 3: Process only alive snakes (no branch prediction penalty)
+        for snake_id in alive_snakes {
+            let snake = &self.snakes[snake_id as usize];
+            
+            // Check for apple consumption before moving
+            let will_eat_apple = if snake.head().is_some() {
+                let new_head = snake.calculate_new_head();
+                self.grid.get_cell(&new_head) == Cell::Apple
+            } else {
+                false
+            };
+            
+            // Move snake (collision detection happens automatically)
+            if snake.move_forward(&mut self.grid, will_eat_apple) {
+                // If snake was going to eat an apple, handle it now
+                if will_eat_apple {
+                    if let Some(head) = snake.head().copied() {
+                        self.grid.set_cell(head, Cell::Empty);
+                        self.num_apples -= 1;
+                        consumed_apples += 1;
+                        // Note: No early termination - process all snakes for better branch prediction
+                    }
+                }
             }
+            // If snake.move_forward() returned false, snake is already dead
         }
 
-        // Phase 7: Spawn new apples to replace consumed ones
+        // Phase 4: Spawn new apples to replace consumed ones
         if consumed_apples > 0 {
             for _ in 0..consumed_apples {
                 self.spawn_apple();

@@ -2,7 +2,7 @@ use crate::game::grid::{GRID_HEIGHT, GRID_WIDTH};
 use rand::Rng;
 use rand::distr::{Distribution, StandardUniform};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub struct Point {
     pub x: u16,
     pub y: u16,
